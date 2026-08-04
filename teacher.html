@@ -1,0 +1,366 @@
+<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>아레테 사가 — 관리자</title>
+<style>
+@font-face{font-family:'DungGeunMo';src:url('https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_2107@1.1/DungGeunMo.woff') format('woff');font-display:swap}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{background:#17121f;color:#efeaf7;font-family:'DungGeunMo','Gothic A1',sans-serif;padding-bottom:70px;overflow-x:hidden}
+h1{font-size:15px;color:#ffca4b}
+.top{position:sticky;top:0;z-index:20;background:#1c1530;padding:10px 14px;display:flex;justify-content:space-between;align-items:center;border-bottom:3px solid #120c1e}
+.wrap{max-width:640px;margin:0 auto;padding:12px}
+.card{background:#271e3d;border:3px solid #120c1e;border-radius:10px;padding:14px;margin-bottom:12px;box-shadow:0 4px 0 #120c1e}
+.card h2{font-size:13px;color:#ffca4b;margin-bottom:10px}
+label{display:block;font-size:11px;color:#a99cc4;margin:8px 0 4px}
+input,textarea,select{width:100%;padding:10px;border-radius:7px;border:2.5px solid #120c1e;background:#1f1830;color:#efeaf7;font-family:inherit;font-size:13px}
+textarea{resize:vertical;min-height:64px}
+button{padding:10px 16px;border-radius:7px;border:2.5px solid #120c1e;background:#ffca4b;color:#4a3100;font-family:inherit;font-size:12.5px;cursor:pointer;box-shadow:0 4px 0 #120c1e}
+button:active{transform:translateY(3px);box-shadow:0 1px 0 #120c1e}
+button.ghost{background:#1f1830;color:#efeaf7}
+button.danger{background:#e05a5a;color:#3a0808}
+button.sm{padding:6px 11px;font-size:11px;box-shadow:0 3px 0 #120c1e}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.msg{font-size:11.5px;margin-top:8px;min-height:14px}
+.chip{background:#1f1830;border:2px solid #4a3a6e;border-radius:7px;padding:7px 12px;font-size:11.5px;display:inline-block;margin:3px 4px 3px 0}
+.chip b{color:#37e0cf}
+table{width:100%;border-collapse:collapse;font-size:11.5px;margin-top:8px}
+th,td{padding:7px 5px;border-bottom:2px solid #120c1e;text-align:left}
+th{color:#ffca4b;font-size:10px;position:sticky;top:44px;background:#271e3d}
+tr:active td{background:rgba(255,255,255,.05)}
+.gauge{height:16px;background:#120c1e;border-radius:8px;overflow:hidden;margin-top:6px;border:2px solid #120c1e}
+.gauge>div{height:100%;background:linear-gradient(90deg,#37e0cf,#66e08a);transition:width .3s}
+.switch{width:46px;height:26px;border-radius:14px;background:#3a3450;position:relative;cursor:pointer;border:2px solid #120c1e;flex-shrink:0}
+.switch.on{background:#66e08a}
+.switch::after{content:'';position:absolute;top:2px;left:2px;width:18px;height:18px;border-radius:50%;background:#efeaf7;transition:left .2s}
+.switch.on::after{left:22px}
+.tabbar{position:fixed;bottom:0;left:0;right:0;background:#1c1530;border-top:3px solid #120c1e;display:flex;z-index:30}
+.tabbar button{flex:1;background:none;border:none;box-shadow:none;border-radius:0;padding:10px 2px;font-size:10px;color:#a99cc4}
+.tabbar button.on{color:#ffca4b}
+.tabbar button .ic{font-size:17px;display:block;margin-bottom:2px}
+.pane{display:none}
+.pane.on{display:block}
+.lockbox{max-width:340px;margin:60px auto;padding:0 16px}
+.muted{color:#a99cc4;font-size:10.5px;line-height:1.7;margin-top:6px}
+.hint{font-size:10px;color:#7a6a94;margin-top:3px}
+</style></head><body>
+
+<!-- ── 잠금 화면 ── -->
+<div id="lock" class="lockbox">
+  <h1 style="font-size:19px;text-align:center;margin-bottom:16px">🏫 아레테 사가 관리자</h1>
+  <div class="card">
+    <label>서버 주소 (Apps Script 웹앱 URL, 끝이 /exec)</label>
+    <input id="api" placeholder="https://script.google.com/macros/s/…/exec">
+    <label>관리자 키</label>
+    <input id="key" type="password" placeholder="adminKey">
+    <button style="width:100%;margin-top:12px" onclick="unlock()">🔓 접속</button>
+    <div id="lockMsg" class="msg" style="color:#ff6b6b"></div>
+    <div class="muted">주소·키는 이 기기에만 저장됩니다.</div>
+  </div>
+</div>
+
+<!-- ── 메인 앱 ── -->
+<div id="app" style="display:none">
+  <div class="top"><h1>🏫 아레테 사가 관리자 <span style="font-size:10px;color:#66e08a">v10.8</span></h1><button class="sm ghost" onclick="logout()">🔒 잠금</button></div>
+  <div class="wrap">
+
+    <!-- 학생 탭 -->
+    <div id="pane-students" class="pane on">
+      <div class="card">
+        <div class="row" style="justify-content:space-between">
+          <h2 style="margin:0">📊 학생 현황</h2>
+          <button class="sm ghost" onclick="loadDash()">🔄 새로고침</button>
+        </div>
+        <div id="sum" style="margin-top:8px"></div>
+        <button class="sm ghost" style="margin-top:8px" onclick="toggleRaw()">🐞 원시 데이터 보기</button>
+        <pre id="rawbox" style="display:none;background:#120e1e;border:2px solid #4a3a6e;border-radius:7px;padding:9px;font-size:10px;white-space:pre-wrap;word-break:break-all;margin-top:8px;max-height:240px;overflow:auto"></pre>
+        <select id="clsFilter" onchange="renderTable()" style="margin-top:10px"></select>
+        <div id="stuList" style="margin-top:10px"></div>
+        <div id="nj" class="muted"></div>
+      </div>
+      <div class="card">
+        <h2>📉 반 전체 오답 TOP15</h2>
+        <div class="muted">학생들이 가장 많이 틀리는 문항이에요. 다음 수업에서 짚어주면 좋아요.</div>
+        <div id="wrongList" style="margin-top:8px"></div>
+      </div>
+    </div>
+
+    <!-- 쿠폰 탭 -->
+    <div id="pane-coupon" class="pane">
+      <div class="card">
+        <h2>🎟️ 간식 쿠폰 교환</h2>
+        <label>학생이 보여준 코드</label>
+        <input id="cpCode" placeholder="예) c_r1_1-1001-A3F9" style="text-transform:uppercase">
+        <button style="width:100%;margin-top:10px" onclick="redeem()">간식 교환 처리</button>
+        <div id="cpMsg" class="msg"></div>
+        <div class="muted">한 코드는 한 번만 교환됩니다. 이미 사용된 코드는 자동으로 거절돼요.</div>
+      </div>
+    </div>
+
+    <!-- 반 운영 탭 -->
+    <div id="pane-class" class="pane">
+      <div class="card">
+        <div class="row" style="justify-content:space-between">
+          <h2 style="margin:0">🤝 반별 협동 목표</h2>
+          <button class="sm ghost" onclick="loadCoop()">🔄</button>
+        </div>
+        <div id="coopList" style="margin-top:6px"></div>
+      </div>
+      <div class="card">
+        <h2>⚙ 목표 설정</h2>
+        <label>목표 정답 수</label><input id="cGoal" type="number">
+        <label>달성 보상 (TP)</label><input id="cReward" type="number">
+        <label>과제 문구</label><input id="cLabel" placeholder="이번 주 반 전체 지식 해방">
+        <button style="width:100%;margin-top:10px" onclick="saveGoal()">저장</button>
+        <div id="goalMsg" class="msg"></div>
+      </div>
+    </div>
+
+    <!-- 이벤트 탭 -->
+    <div id="pane-event" class="pane">
+      <div class="card">
+        <h2>🎉 이벤트 주간</h2>
+        <div class="row" style="justify-content:space-between;margin-top:6px">
+          <div><div style="font-size:12.5px">정답 보상(EXP·TP) 2배</div><div class="hint">사냥 보상은 배수 대상 아님 — 공부 몰아치기용</div></div>
+          <div id="evtSwitch" class="switch" onclick="toggleEvent()"></div>
+        </div>
+        <div id="evtMsg" class="msg"></div>
+      </div>
+      <div class="card">
+        <h2>📢 공지사항</h2>
+        <label>제목</label><input id="anTitle" placeholder="📢 환영합니다!">
+        <label>내용</label><textarea id="anBody" placeholder="학생들에게 보여줄 공지 내용"></textarea>
+        <button style="width:100%;margin-top:10px" onclick="saveAnnounce()">공지 등록 (전원에게 다시 표시)</button>
+        <div id="anMsg" class="msg"></div>
+        <div class="muted">등록하면 이미 확인한 학생에게도 새 공지가 다시 뜹니다.</div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div id="tabbar" class="tabbar" style="display:none">
+  <button id="tb-students" class="on" onclick="showTab('students')"><span class="ic">📊</span>학생</button>
+  <button id="tb-coupon" onclick="showTab('coupon')"><span class="ic">🎟️</span>쿠폰</button>
+  <button id="tb-class" onclick="showTab('class')"><span class="ic">🤝</span>반 운영</button>
+  <button id="tb-event" onclick="showTab('event')"><span class="ic">🎉</span>이벤트</button>
+</div>
+
+<script>
+var API='', KEY='';
+var IN_GAS = !!(window.google && window.google.script && window.google.script.run);
+var $=function(id){return document.getElementById(id);};
+window.onerror=function(msg,src,line,col,err){
+  var b=document.getElementById('errbanner');
+  if(!b){ b=document.createElement('div'); b.id='errbanner';
+    b.style.cssText='position:fixed;top:0;left:0;right:0;z-index:999;background:#e05a5a;color:#fff;font-size:11px;padding:8px 12px;white-space:pre-wrap';
+    document.body.appendChild(b); }
+  b.textContent='⚠ 화면 오류: '+msg+' (줄 '+line+')';
+  return false;
+};
+
+/* ── 잠금/접속 ── */
+(function(){
+  API=localStorage.getItem('t_api')||''; KEY=localStorage.getItem('t_key')||'';
+  $('api').value=API; $('key').value=KEY;
+  if(IN_GAS){
+    // Apps Script 안에서는 서버 주소가 필요 없다
+    $('api').parentNode.querySelector('label').style.display='none';
+    $('api').style.display='none';
+  }
+  if((API||IN_GAS)&&KEY) tryEnter();
+})();
+function unlock(){
+  API=$('api').value.trim(); KEY=$('key').value.trim();
+  if(!KEY){ $('lockMsg').textContent='관리자 키를 입력하세요.'; return; }
+  if(!IN_GAS && !API){ $('lockMsg').textContent='서버 주소를 입력하세요.'; return; }
+  $('lockMsg').textContent='확인 중…';
+  post('adminGetSettings',[KEY]).then(function(j){
+    if(!j||!j.ok){ $('lockMsg').textContent=(j&&j.msg)||'접속 실패. 주소/키를 확인하세요.'; return; }
+    localStorage.setItem('t_api',API); localStorage.setItem('t_key',KEY);
+    enterApp(j.settings);
+  }).catch(function(e){ $('lockMsg').textContent='연결 실패: '+(e&&e.message||e); });
+}
+function tryEnter(){
+  post('adminGetSettings',[KEY]).then(function(j){ if(j&&j.ok) enterApp(j.settings); });
+}
+function logout(){
+  localStorage.removeItem('t_api'); localStorage.removeItem('t_key');
+  location.reload();
+}
+function enterApp(settings){
+  $('lock').style.display='none'; $('app').style.display='block'; $('tabbar').style.display='flex';
+  fillSettings(settings);
+  loadDash(); loadCoop();
+}
+function post(fn,args){
+  // Apps Script 안(iframe 샌드박스)에서 열렸으면 google.script.run 사용.
+  // 이 환경에서 fetch로 script.google.com을 호출하면 교차 도메인이라 302로 튕긴다.
+  if(window.google && google.script && google.script.run){
+    return new Promise(function(res,rej){
+      google.script.run.withSuccessHandler(res).withFailureHandler(rej)[fn].apply(google.script.run,args);
+    });
+  }
+  // Netlify 등 외부에서 열렸으면 JSON API로 호출
+  return fetch(API,{method:'POST',body:JSON.stringify({fn:fn,args:args})}).then(function(r){return r.json();});
+}
+
+/* ── 탭 전환 ── */
+function showTab(name){
+  ['students','coupon','class','event'].forEach(function(t){
+    $('pane-'+t).classList.toggle('on', t===name);
+    $('tb-'+t).classList.toggle('on', t===name);
+  });
+}
+
+/* ── 학생 탭 ── */
+function loadDash(){
+  $('sum').innerHTML='<span class="chip">불러오는 중…</span>';
+  post('dash',[KEY]).then(function(j){
+    if(!j||!j.ok){
+      $('sum').innerHTML='<span class="chip" style="border-color:#e05a5a;color:#ff8a8a">⚠ '+((j&&j.msg)||'불러오기 실패(응답 없음)')+'</span>';
+      $('stuList').innerHTML='';
+      return;
+    }
+    window._data=j;
+    var errChip=j.rowErrors?('<span class="chip" style="border-color:#e0a05a;color:#ffca4b">⚠ 손상된 세이브 '+j.rowErrors+'건(건너뜀)</span>'):'';
+    var zeroHint=(j.saveRowCount>0 && j.rows.length===0)?
+      '<div class="muted" style="color:#ff8a8a">세이브 시트에 '+j.saveRowCount+'행이 있는데 표시된 학생이 0명이에요. 데이터 형식 문제일 수 있어요 — 시트를 직접 열어 [세이브] 탭을 확인해 주세요.</div>':'';
+    $('sum').innerHTML=
+      '<span class="chip">가입 <b>'+j.rows.length+'</b>/'+j.total+'명</span>'+
+      '<span class="chip">평균 Lv <b>'+j.avgLevel+'</b></span>'+
+      '<span class="chip">미가입 <b>'+j.notJoined.length+'</b>명</span>'+errChip+zeroHint;
+    var cf=$('clsFilter'); var classes=(j.classSummary||[]).map(function(c){return c.cls;}).sort();
+    cf.innerHTML='<option value="">전체 반</option>'+classes.map(function(c){return '<option value="'+c+'">'+c+'</option>';}).join('');
+    renderTable();
+    renderWrongList(j.wrongTop || []);
+    $('nj').textContent=j.notJoined.length?('미가입: '+j.notJoined.join(', ')):'전원 가입 완료! 🎉';
+  });
+}
+function renderWrongList(list){
+  var el=$('wrongList');
+  if(!list.length){ el.innerHTML='<div class="muted">아직 집계된 오답이 없어요.</div>'; return; }
+  var html='';
+  list.forEach(function(x,i){
+    var q=String(x.question||'').replace(/</g,'');
+    if(q.length>60) q=q.slice(0,60)+'…';
+    html+='<div style="background:#1f1830;border:2px solid #120c1e;border-radius:7px;padding:8px 10px;margin-bottom:6px">'+
+      '<div style="display:flex;justify-content:space-between;gap:8px">'+
+        '<span style="color:#a99cc4;font-size:10px">#'+(i+1)+' · '+(x.region||'')+' · '+x.qid+'</span>'+
+        '<span style="color:#ff8a8a;font-size:11px;flex-shrink:0"><b>'+x.wrong+'</b>회 오답</span>'+
+      '</div>'+
+      '<div style="font-size:11.5px;margin-top:3px">'+q+'</div>'+
+    '</div>';
+  });
+  el.innerHTML=html;
+}
+function renderTable(){
+  var j=window._data;
+  var el=$('stuList'); if(!el) return;
+  if(!j||!j.rows){ el.innerHTML='<div style="color:#ff8a8a;font-size:11.5px">데이터가 없습니다. [새로고침]을 눌러주세요.</div>'; return; }
+  var f=$('clsFilter').value;
+  var rows=j.rows.filter(function(r){return !f||r.cls===f;});
+  rows.sort(function(a,b){return (b.power||0)-(a.power||0);});
+  if(rows.length===0){
+    el.innerHTML='<div style="color:#ffca4b;font-size:11.5px">'+
+      (j.rows.length>0?('선택한 반("'+f+'")에 학생이 없어요. "전체 반"으로 바꿔보세요.'):'아직 가입한 학생이 없습니다.')+'</div>';
+    return;
+  }
+  var html='';
+  rows.forEach(function(r){
+    var nm=String(r.name||'(이름없음)').replace(/</g,'');
+    html+='<div style="background:#1f1830;border:2.5px solid #120c1e;border-radius:9px;padding:10px 12px;margin-bottom:8px">'+
+      '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">'+
+        '<div style="color:#efeaf7;font-size:13px"><b>'+nm+'</b> '+
+          '<span style="color:#a99cc4;font-size:11px">'+(r.cls||'반없음')+' · '+(r.hakbun||'')+'</span></div>'+
+        '<button class="sm ghost" onclick="doResetPw(\''+(r.hakbun||'')+'\',\''+nm.replace(/'/g,'')+'\')">🔑 비번 초기화</button>'+
+      '</div>'+
+      '<div style="margin-top:7px;color:#efeaf7;font-size:11.5px">'+
+        'Lv <b style="color:#ffca4b">'+(r.level!=null?r.level:'-')+'</b>'+
+        ' · 전투력 <b style="color:#ffca4b">'+(r.power!=null?r.power:0)+'</b>'+
+        ' · 코어 <b>'+(r.cleared||0)+'/5</b>'+
+        ' · 정답 <b style="color:#66e08a">'+(r.solved||0)+'</b>'+
+        ' · 오늘 <b style="color:#37e0cf">'+(r.todaySolve||0)+'</b>'+
+      '</div>'+
+      (r.last?'<div style="margin-top:4px;color:#7a6a94;font-size:10px">최근 접속 '+String(r.last).slice(0,24)+'</div>':'')+
+    '</div>';
+  });
+  el.innerHTML=html;
+}
+function toggleRaw(){
+  var b=$('rawbox');
+  if(b.style.display==='none'){
+    var j=window._data;
+    b.textContent = j ? ('rows 개수: '+(j.rows?j.rows.length:'없음')+'\n\n'+JSON.stringify(j.rows,null,1)) : '아직 데이터를 못 받았습니다.';
+    b.style.display='block';
+  } else b.style.display='none';
+}
+function doResetPw(hakbun,name){
+  if(!confirm(name+'('+hakbun+') 학생의 비밀번호를 초기화할까요?\\n다음 로그인 시 입력하는 값이 새 비밀번호가 됩니다.')) return;
+  post('adminResetPassword',[KEY,hakbun]).then(function(j){
+    alert((j&&j.msg)||(j&&j.ok?'초기화 완료':'실패'));
+  });
+}
+
+/* ── 쿠폰 탭 ── */
+function redeem(){
+  var code=$('cpCode').value.trim();
+  if(!code){ $('cpMsg').textContent='코드를 입력하세요.'; $('cpMsg').style.color='#ff6b6b'; return; }
+  $('cpMsg').textContent='확인 중…'; $('cpMsg').style.color='#a99cc4';
+  post('redeemCoupon',[KEY,code]).then(function(j){
+    if(j.ok){ $('cpMsg').innerHTML='✅ <b>'+j.name+'</b>('+j.hakbun+') — <b style="color:#ffca4b">'+j.snack+'</b> 교환 완료!'; $('cpMsg').style.color='#66e08a'; $('cpCode').value=''; }
+    else if(j.already){ $('cpMsg').innerHTML='⚠️ 이미 교환됨 ('+j.name+' · '+j.snack+')'; $('cpMsg').style.color='#ffca4b'; }
+    else { $('cpMsg').textContent=j.msg||'실패'; $('cpMsg').style.color='#ff6b6b'; }
+  }).catch(function(e){ $('cpMsg').textContent='연결 실패: '+e.message; $('cpMsg').style.color='#ff6b6b'; });
+}
+
+/* ── 반 운영 탭 ── */
+function loadCoop(){
+  post('adminCoopStatus',[KEY]).then(function(j){
+    if(!j||!j.ok) return;
+    $('cGoal').value=j.goal; $('cReward').value=j.reward;
+    var el=$('coopList'); el.innerHTML='';
+    j.list.forEach(function(c){
+      var pct=Math.min(100,Math.round(c.total/c.goal*100));
+      el.innerHTML+='<div style="margin-top:10px"><div class="row" style="justify-content:space-between">'+
+        '<b style="font-size:12.5px">'+c.cls+'</b><span style="font-size:11px">'+c.total+' / '+c.goal+(c.reached?' 🎉':'')+'</span></div>'+
+        '<div class="gauge"><div style="width:'+pct+'%"></div></div>'+
+        '<button class="sm ghost" style="margin-top:6px" onclick="resetClass(\''+c.cls+'\')">이 반만 초기화</button></div>';
+    });
+  });
+}
+function resetClass(cls){
+  if(!confirm('"'+cls+'" 반의 협동 카운터를 초기화할까요?')) return;
+  post('adminCoopReset',[KEY,cls]).then(function(){ loadCoop(); });
+}
+function saveGoal(){
+  var patch={coopGoal:Number($('cGoal').value)||200, coopReward:Number($('cReward').value)||50, coopLabel:$('cLabel').value};
+  post('adminSaveSettings',[KEY,patch]).then(function(j){
+    $('goalMsg').textContent=j&&j.ok?'저장했습니다.':'실패'; $('goalMsg').style.color=j&&j.ok?'#66e08a':'#ff6b6b';
+    loadCoop();
+  });
+}
+
+/* ── 이벤트 탭 ── */
+var _evtOn=false;
+function toggleEvent(){
+  _evtOn=!_evtOn;
+  post('adminEventToggle',[KEY,_evtOn]).then(function(j){
+    $('evtSwitch').classList.toggle('on',_evtOn);
+    $('evtMsg').textContent=_evtOn?'🎉 이벤트 주간 시작! 정답 보상 2배':'이벤트 종료, 평소 보상으로 복귀';
+    $('evtMsg').style.color=_evtOn?'#66e08a':'#a99cc4';
+  });
+}
+function saveAnnounce(){
+  var t=$('anTitle').value.trim(), b=$('anBody').value.trim();
+  if(!t||!b){ $('anMsg').textContent='제목과 내용을 입력하세요.'; $('anMsg').style.color='#ff6b6b'; return; }
+  post('adminSaveAnnounce',[KEY,t,b]).then(function(j){
+    $('anMsg').textContent=j&&j.ok?'공지를 등록했습니다! 학생들에게 다시 표시됩니다.':'실패';
+    $('anMsg').style.color=j&&j.ok?'#66e08a':'#ff6b6b';
+  });
+}
+function fillSettings(s){
+  _evtOn=!!s.eventOn; $('evtSwitch').classList.toggle('on',_evtOn);
+  $('anTitle').value=s.announceTitle||''; $('anBody').value=s.announceBody||'';
+  $('cGoal').value=s.coopGoal||200; $('cReward').value=s.coopReward||50; $('cLabel').value=s.coopLabel||'';
+}
+</script>
+</body></html>
