@@ -223,10 +223,43 @@ function decorFor(reg,v){
   if(reg==='r1') return v<0.45?['flower',Math.floor(v*6.6)%3]:(v<0.7?['tuft']:(v<0.85?['mush']:['stone']));
   if(reg==='r2') return v<0.4?['crystal',v<0.2?0:1]:(v<0.7?['stone']:['bone']);
   if(reg==='r3') return v<0.4?['cactus']:(v<0.7?['stone']:['skull']);
-  if(reg==='r4') return v<0.15?['lamp']:(v<0.6?['flower',Math.floor(v*9)%3]:['tuft']);
+  if(reg==='r4') return v<0.06?['lamp']:(v<0.5?['flower',Math.floor(v*9)%3]:['tuft']);
   return v<0.35?['torch']:(v<0.65?['skull']:['stone']);
 }
 function pushLight(x,y,r,c){ if(window.RM&&RM.lights) RM.lights.push({x:x,y:y,r:r,c:c}); }
+
+
+var PZ={r1:['#8a8a7a','#6a6a5c','#a8a898'],r2:['#5a5078','#443c60','#7a70a0'],r3:['#d8b88a','#b8986a','#ecd0a4'],
+        r4:['#c8c0b0','#a8a090','#e0d8c8'],r5:['#8a7e9e','#6a5f7e','#a89cbc']};
+function genPath2(g,R,reg,mask){
+  var p=PP[reg], gp=GP[reg], i, xx, h;
+  box(g,0,0,16,16,p.b);
+  if(reg==='r5'){
+    for(i=0;i<16;i+=4){ box(g,i,4,2,1,p.l); box(g,i+2,11,2,1,p.l); }
+    if(mask&1){ box(g,0,0,16,2,gp.b); box(g,0,2,16,1,p.x); } if(mask&4){ box(g,0,14,16,2,gp.b); box(g,0,13,16,1,p.x); }
+    if(mask&8){ box(g,0,0,2,16,gp.b); box(g,2,0,1,16,p.x); } if(mask&2){ box(g,14,0,2,16,gp.b); box(g,13,0,1,16,p.x); }
+    return;
+  }
+  for(i=0;i<22;i++) dot(g,R()*16|0,R()*16|0,R()<0.5?p.d:p.l);
+  for(i=0;i<2;i++){ var x=R()*15|0,y=R()*15|0; dot(g,x,y,p.x); dot(g,x,y+1,p.d); }
+  for(xx=0;xx<16;xx++){
+    if(mask&1){ h=1+(R()*3|0); box(g,xx,0,1,h,gp.b); dot(g,xx,h,p.d); }
+    if(mask&4){ h=1+(R()*3|0); box(g,xx,16-h,1,h,gp.b); dot(g,xx,15-h,p.l); }
+    if(mask&8){ h=1+(R()*3|0); box(g,0,xx,h,1,gp.b); dot(g,h,xx,p.d); }
+    if(mask&2){ h=1+(R()*3|0); box(g,16-h,xx,h,1,gp.b); dot(g,15-h,xx,p.l); }
+  }
+}
+function genPlaza(g,R,reg){
+  var c=PZ[reg]||PZ.r1, i;
+  box(g,0,0,16,16,c[0]);
+  for(var sy=0;sy<16;sy+=8) for(var sx=0;sx<16;sx+=8){
+    var alt=(reg==='r5'&&((sx+sy)/8)%2)?c[2]:c[0];
+    box(g,sx,sy,8,8,alt); box(g,sx,sy,8,1,c[1]); box(g,sx,sy,1,8,c[1]); box(g,sx+1,sy+1,6,1,c[2]);
+  }
+  for(i=0;i<6;i++) dot(g,R()*16|0,R()*16|0,c[1]);
+  if(reg==='r1') for(i=0;i<5;i++) dot(g,R()*16|0,R()*16|0,'#5f9a4a');
+  if(reg==='r2') { box(g,6,6,4,1,'#8fe8ff'); box(g,7,5,2,3,'#8fe8ff'); }
+}
 
 /* ═══════════════ 4. drawGround / drawObject 교체 ═══════════════ */
 function isWall(lz,x,y){ return blockedLocal(lz,x,y)&&!isWater(lz,x,y); }
@@ -238,7 +271,22 @@ drawGround=function(g,regId,tx,ty,sx,sy,reach){
     var fr=(Math.floor(now()/520)+tx+ty)%2;
     var foam=(ltx===1)?'R':(ltx===ZC-2?'L':'');
     c=tile('wa|'+fr+foam+'|'+((tx*7+ty*3)%4),function(gg,R){ genWater(gg,R,fr,foam); });
-    g.drawImage(c,sx,sy,T,T); return;
+    g.drawImage(c,sx,sy,T,T);
+    if(ltx>=2&&ltx<=ZC-3){
+      if(!isWater(lz,ltx,ty-1)){ box(g,sx,sy,T,k*2,'#1d4470'); box(g,sx,sy+k*2,T,k,'#3a6ea8'); }
+      if(!isWater(lz,ltx,ty+1)){ box(g,sx,sy+T-k*2,T,k*2,'#d8f0ff'); }
+      if(!isWater(lz,ltx-1,ty)){ box(g,sx,sy,k*2,T,'#bfe2fa'); }
+      if(!isWater(lz,ltx+1,ty)){ box(g,sx+T-k*2,sy,k*2,T,'#bfe2fa'); }
+    }
+    return;
+  }
+  var wc=(window.WORLD&&WORLD.code)?WORLD.code(lz,ltx,ty):0;
+  if(wc===6){
+    c=tile('br||'+(tx%3),function(gg,R){ genBridge(gg,R,''); });
+    var vert=isWater(lz,ltx-1,ty)&&isWater(lz,ltx+1,ty);
+    if(vert){ g.save(); g.translate(sx+T/2,sy+T/2); g.rotate(Math.PI/2); g.drawImage(c,-T/2,-T/2,T,T); g.restore(); }
+    else g.drawImage(c,sx,sy,T,T);
+    return;
   }
   var road=(ty===ROAD||ty===ROAD-1);
   if(road&&(ltx<2||ltx>ZC-3)){
@@ -250,9 +298,16 @@ drawGround=function(g,regId,tx,ty,sx,sy,reach){
   if(road){
     var e=(ty===ROAD-1)?'top':'bot';
     c=tile('p|'+regId+'|'+e+'|'+v,function(gg,R){ genPath(gg,R,regId,e); });
+  } else if(wc===3){
+    var pl=function(x,y){ if(y===ROAD||y===ROAD-1) return 1; var q=WORLD.code(lz,x,y); return q===3||q===4||q===6; };
+    var mask=(pl(ltx,ty-1)?0:1)|(pl(ltx+1,ty)?0:2)|(pl(ltx,ty+1)?0:4)|(pl(ltx-1,ty)?0:8);
+    c=tile('p2|'+regId+'|'+mask+'|'+v,function(gg,R){ genPath2(gg,R,regId,mask); });
+  } else if(wc===4){
+    c=tile('pz|'+regId+'|'+v,function(gg,R){ genPlaza(gg,R,regId); });
   } else {
-    var alt=(regId==='r4')?(Math.floor(tx/2)%2):0;
-    c=tile('g|'+regId+'|'+alt+'|'+v,function(gg,R){ genGround(gg,R,regId,alt); });
+    var greg=(wc===5&&regId==='r3')?'r1':regId;
+    var alt=(greg==='r4')?(Math.floor(tx/2)%2):0;
+    c=tile('g|'+greg+'|'+alt+'|'+v,function(gg,R){ genGround(gg,R,greg,alt); });
   }
   g.drawImage(c,sx,sy,T,T);
   if(blockedLocal(lz,ltx,ty)) return;
@@ -261,8 +316,14 @@ drawGround=function(g,regId,tx,ty,sx,sy,reach){
     g.fillStyle='rgba(10,4,20,.34)'; g.fillRect(sx,sy,T,k*3);
     g.fillStyle='rgba(10,4,20,.16)'; g.fillRect(sx,sy+k*3,T,k*2);
   }
-  if(road) return;
+  if(road||wc===3||wc===4) return;
   var h=hash(tx*17+3,ty*29+7);
+  if(wc===5&&h<0.6){
+    var fv=Math.floor(h*50)%3, fs=sprite('dc|flower|'+fv,DECOR.flower,DPAL.flower[fv]);
+    blit(g,fs,sx+((hash(tx,ty*5)*6)|0)*k,sy+T-fs.height*k-k,k);
+    if(h<0.25){ var fs2=sprite('dc|flower|'+((fv+1)%3),DECOR.flower,DPAL.flower[(fv+1)%3]); blit(g,fs2,sx+T/2-k*2,sy+k,k); }
+    return;
+  }
   if(h<0.085){
     var d=decorFor(regId,h/0.085), name=d[0], pal=DPAL[name];
     if(Array.isArray(pal)) pal=pal[d[1]||0];
@@ -543,5 +604,5 @@ ART.lib={mk:mk,paint:paint,outline:outline,sh:sh,HAT_OF:HAT_OF,HAIR_OV:HAIR_OV};
 
 /* 이미 그려진 아바타(캐릭터 선택·랭킹)도 새 도트로 다시 그리기 */
 setTimeout(function(){ try{ if(typeof paintHeroAvatars==='function') paintHeroAvatars(document); }catch(e){} },300);
-try{ var ver=document.getElementById('ver'); if(ver) ver.textContent='빌드 v12 도트 아트'; }catch(e){}
+try{ var ver=document.getElementById('ver'); if(ver) ver.textContent='빌드 v15 도트 아트'; }catch(e){}
 })();
