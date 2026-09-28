@@ -477,6 +477,73 @@ renderMapNodes=function(){
   };
 })();
 
-function setVer(){ try{ var ver=document.getElementById('ver'); if(ver) ver.textContent='빌드 v18 HUD 정리'; }catch(e){} }
+
+/* ═══════════════ v19 회원가입 개방 · 상자 쿨타임 ═══════════════ */
+(function(){
+  /* 가입 화면: 이름 안내 문구 변경 + 반 선택 추가 */
+  var _ri=renderIntro;
+  renderIntro=function(tab){
+    _ri(tab);
+    if((tab||'login')!=='signup') return;
+    document.querySelectorAll('#intro-body .inlab').forEach(function(l){ if(l.textContent.indexOf('이름')>=0) l.textContent='🧑 이름'; });
+    var pw=document.getElementById('su-pw'); if(!pw) return;
+    var pwLab=pw.previousElementSibling;
+    var lab=document.createElement('div'); lab.className='inlab'; lab.textContent='🏫 반 (명단에 있는 학생은 자동으로 정해져요)';
+    var sel=document.createElement('select'); sel.id='su-cls';
+    sel.style.cssText='width:100%;padding:12px;font-size:15px;border-radius:6px;border:3px solid var(--line);background:var(--bg2);color:var(--text);margin:5px 0 12px;font-family:var(--font-body)';
+    sel.innerHTML='<option value="">선택 안 함 (기타)</option>';
+    pw.parentNode.insertBefore(lab,pwLab); pw.parentNode.insertBefore(sel,pwLab);
+    try{ srv('signupInfo').then(function(r){
+      if(r&&r.ok&&r.classes) r.classes.forEach(function(c){ var o=document.createElement('option'); o.value=c; o.textContent=c; sel.appendChild(o); });
+    }).catch(function(){}); }catch(err){}
+  };
+  doSignup=function(){
+    var id=(document.getElementById('su-id').value||'').trim();
+    var name=(document.getElementById('su-name').value||'').trim();
+    var pw=document.getElementById('su-pw').value||'';
+    var pw2=document.getElementById('su-pw2').value||'';
+    var cs=document.getElementById('su-cls'), cls=cs?cs.value:'';
+    if(!id||!name){ inMsg('학번과 이름을 입력하세요.'); return; }
+    if(pw.length<4){ inMsg('비밀번호는 4자 이상!'); return; }
+    if(pw!==pw2){ inMsg('비밀번호 확인이 달라요.'); return; }
+    inMsg('가입 중...');
+    srv('signup',id,name,pw,cls).then(function(r){
+      if(!r.ok){ inMsg(r.msg||'가입 실패'); return; }
+      inMsg(''); toast('✍ <b>가입 완료!</b> 모험을 시작합니다');
+      G._pw=pw; loginWith(id,pw);
+    }).catch(function(e){ inMsg('서버 오류: '+((e&&e.message)||e)); });
+  };
+
+  /* 상자: 1시간(서버 설정값)마다 다시 열림 */
+  function chestCdMs(){ var v=G.settings&&G.settings.chestCooldownMin; v=(v===''||v==null||isNaN(Number(v)))?60:Number(v); return v*60000; }
+  function chestRemain(e){
+    var st=((G.save&&G.save['문제상태'])||{})['chest_'+e.key];
+    if(!st||!st.at) return 0;
+    var r=chestCdMs()-(Date.now()-st.at); return r>0?r:0;
+  }
+  var _inter=interactable;
+  interactable=function(e){ if(e.type==='chest') return true; return _inter(e); };
+  var _doChest=doChest;
+  doChest=function(e){
+    var rem=chestRemain(e);
+    if(rem>0){ toast('📦 빈 상자예요. 다시 채워지기까지 <b>'+Math.ceil(rem/60000)+'분</b>'); return; }
+    if(G.guest&&G._gst){ G._gst['문제상태']['chest_'+e.key]={solved:true,at:Date.now()}; }
+    _doChest(e);
+  };
+  var _dc=drawChest;
+  drawChest=function(g,cx,cy){
+    var e=window.ART&&ART.curE, rem=e?chestRemain(e):0;
+    if(rem<=0){ _dc(g,cx,cy); return; }
+    g.save(); g.globalAlpha=(g.globalAlpha||1)*0.4; _dc(g,cx,cy); g.restore();
+    if(Math.hypot(e.tx-player.x,e.ty-player.y)<2.6){
+      var t='⏳ '+Math.ceil(rem/60000)+'분';
+      g.save(); g.font='13px DungGeunMo,sans-serif'; g.textAlign='center'; g.textBaseline='middle';
+      g.lineWidth=3; g.strokeStyle='#000'; g.fillStyle='#ffe070';
+      g.strokeText(t,cx,cy-TILE*0.55); g.fillText(t,cx,cy-TILE*0.55); g.restore();
+    }
+  };
+})();
+
+function setVer(){ try{ var ver=document.getElementById('ver'); if(ver) ver.textContent='빌드 v19 가입개방·상자'; }catch(e){} }
 window.addEventListener('DOMContentLoaded',setVer); window.addEventListener('load',setVer);
 })();
