@@ -453,5 +453,6 @@ renderMapNodes=function(){
   });
 };
 
-setTimeout(function(){ try{ var ver=document.getElementById('ver'); if(ver) ver.textContent='빌드 v16 군도 지도'; }catch(e){} },0);
+function setVer(){ try{ var ver=document.getElementById('ver'); if(ver) ver.textContent='빌드 v17 군도 지도'; }catch(e){} }
+window.addEventListener('DOMContentLoaded',setVer); window.addEventListener('load',setVer);
 })();
