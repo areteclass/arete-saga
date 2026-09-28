@@ -544,6 +544,43 @@ renderMapNodes=function(){
   };
 })();
 
-function setVer(){ try{ var ver=document.getElementById('ver'); if(ver) ver.textContent='빌드 v19 가입개방·상자'; }catch(e){} }
+
+/* ═══════════════ v20 사냥 몹 즉시 처치 ═══════════════
+   원래는 서버 응답(보상 저장)이 돌아온 뒤에야 몹이 사라져서, 정식 계정에서는
+   통신 시간(1~3초)만큼 쓰러진 몹이 남아 있었다. 체험판은 서버를 안 거쳐서 괜찮았다.
+   → 체력이 0이 되는 순간 바로 사라지게 하고, 보상은 뒤에서 서버가 처리한다. */
+(function(){
+  doHunt=function(e){
+    if(e._pending) return;
+    e._pending=true; e.dead=true; e.wind=0; e.aggro=false;
+    if(window.RM&&RM.coins){
+      for(var i=0;i<7;i++){ var a=Math.random()*6.28, sp=2+Math.random()*2.5;
+        RM.coins.push({x:e.tx+0.5,y:e.ty+0.2,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp-2,t:0}); }
+    }
+    for(var k=0;k<10;k++){ var an=Math.random()*6.28, v=0.6+Math.random()*1.4;
+      particle(e.tx+0.5,e.ty+0.2,Math.cos(an)*v,Math.sin(an)*v-0.6,0.5+Math.random()*0.3,'#d8d4e8',null,false); }
+    var cd=(Number(G.settings&&G.settings.huntRespawnSec)||20)*1000;
+    setTimeout(function(){ e.dead=false; e.hp=undefined; e.maxhp=undefined; e._pending=false; },cd);
+    var p;
+    try{ p=srv('huntReward',G.hakbun,e.key); }catch(err){ return; }
+    p.then(function(r){
+      if(!r||!r.ok){ if(!(r&&r.cooldown)) toast((r&&r.msg)||'보상 처리 실패'); return; }
+      G.save=r.save; syncFromSave();
+      if(r.drop){
+        sfx('relic'); shakeScreen(6); vib([40,60,40]); doFlash();
+        sparkle(e.tx+0.5,e.ty); burstMotes(e.tx+0.5,e.ty);
+        showGetCard(r.drop.id,r.drop.name,'🎁 몬스터 전리품');
+      } else if(r.dropDup){ sfx('chest'); toast('🎁 중복 전리품 → <b>TP +'+r.dropDup+'</b>'); }
+      else if(!autoHunt){
+        var bn=(BEAST_NAME[(G.regions[e.z]||{}).id]||[])[e.sp||0]||'몬스터';
+        var pre=(e.tier===2?'👹 <b>희귀 '+bn+'</b> ':e.tier===1?'⚔ 정예 '+bn+' ':'🍃 '+bn+' ');
+        toast(pre+'처치! TP +'+r.tp+' · EXP +'+r.exp);
+      }
+      if(r.leveledUp) levelUpFx();
+    }).catch(function(){ toast('통신 오류 — 이번 보상은 저장되지 않았을 수 있어요'); });
+  };
+})();
+
+function setVer(){ try{ var ver=document.getElementById('ver'); if(ver) ver.textContent='빌드 v20 즉시처치'; }catch(e){} }
 window.addEventListener('DOMContentLoaded',setVer); window.addEventListener('load',setVer);
 })();
