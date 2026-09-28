@@ -453,6 +453,30 @@ renderMapNodes=function(){
   });
 };
 
-function setVer(){ try{ var ver=document.getElementById('ver'); if(ver) ver.textContent='빌드 v17 군도 지도'; }catch(e){} }
+
+/* ═══════════════ HUD 겹침 수정 (v18) ═══════════════
+   1) 지역 이름·해방 진행 칩을 화면 가운데 → 오른쪽 미니맵 아래로 옮겨 왼쪽 HUD와 겹치지 않게
+   2) 카메라: 플레이어가 맵 위/아래 끝에 가도 HUD·조작 버튼 밑에 숨지 않도록 안전 구역 유지 */
+(function(){
+  var css=document.createElement('style');
+  css.textContent=[
+    '#zone-chip{top:120px!important;left:auto!important;right:8px!important;transform:none!important;width:118px;',
+    ' text-align:center;font-size:10px!important;padding:3px 4px!important;overflow:hidden;text-overflow:ellipsis}',
+    '#prog-chip{top:146px!important;left:auto!important;right:8px!important;transform:none!important;width:118px!important}',
+    '#event-badge{top:176px!important;left:auto!important;right:8px!important;transform:none!important;font-size:10px!important}'
+  ].join('\n');
+  document.head.appendChild(css);
+  var SAFE_TOP=200, SAFE_BOT=220;
+  var _updCam=update;
+  update=function(dt){
+    _updCam(dt);
+    if(!G.save||!running) return;
+    var psy=player.y*TILE-cam.y;
+    if(psy<SAFE_TOP) cam.y=player.y*TILE-SAFE_TOP;
+    else if(psy>H-SAFE_BOT) cam.y=player.y*TILE-(H-SAFE_BOT);
+  };
+})();
+
+function setVer(){ try{ var ver=document.getElementById('ver'); if(ver) ver.textContent='빌드 v18 HUD 정리'; }catch(e){} }
 window.addEventListener('DOMContentLoaded',setVer); window.addEventListener('load',setVer);
 })();
