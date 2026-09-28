@@ -1,5 +1,5 @@
 /* ═══════════════════════════════════════════════════════════════
-   아레테 사가 v13 월드 확장 (world.js)
+   아레테 사가 v15 월드 (world.js) — 넓은 섬 + 설계된 지형
    - 섬 크기 38×17 → 56×25 타일 (약 2.2배)
    - 퀴즈 수호병: 한 줄로 늘어서던 배치 → 섬 전체에 흩어 배치, 동시 출현 수 제한
    - 사냥 몹·보물상자: 섬 곳곳(상자는 막다른 구석)에 배치, 모두 길로 연결된 칸에만
@@ -27,7 +27,14 @@ try{
   if(window.RM) RM.mmCache={};
 }catch(e){}
 
-/* ── 강제로 비워 둘 칸(보스 앞마당·모닥불·상점) ── */
+/* ═══════════════ 지형 설계 (v15) ═══════════════
+   섬마다 '장소'가 느껴지도록 규칙 기반으로 지형을 짓는다.
+   코드: 0 땅 · 1 벽/나무 · 2 물 · 3 오솔길 · 4 광장 · 5 꽃밭 · 6 다리 */
+var TM={};
+function tcode(z,x,y){ var m=TM[z]; if(!m||x<0||x>=ZC||y<0||y>=ZR) return 0; return m[y*ZC+x]; }
+window.WORLD={ code:tcode };
+var _isWaterOrig=isWater;
+isWater=function(z,tx,ty){ if(_isWaterOrig(z,tx,ty)) return true; return tcode(z,tx,ty)===2; };
 var CLEAR={};
 function clearArea(z,cx,cy,rx,ry){
   for(var x=cx-rx;x<=cx+rx;x++) for(var y=cy-ry;y<=cy+ry;y++){
@@ -37,9 +44,139 @@ function clearArea(z,cx,cy,rx,ry){
 }
 var _blocked=blockedLocal;
 blockedLocal=function(z,tx,ty){
+  if(ty<1||ty>ZR-2) return true;
+  if(_isWaterOrig(z,tx,ty)) return true;
+  if(tx<2||tx>ZC-3) return false;
   if(CLEAR[z+','+tx+','+ty]) return false;
-  return _blocked(z,tx,ty);
+  var m=TM[z]; if(!m) return _blocked(z,tx,ty);
+  var c=m[ty*ZC+tx]; return c===1||c===2;
 };
+
+function seeded(s){ return function(){ s|=0; s=s+0x6D2B79F5|0; var t=Math.imul(s^s>>>15,1|s); t=t+Math.imul(t^t>>>7,61|t)^t; return ((t^t>>>14)>>>0)/4294967296; }; }
+function vnoise(x,y,sc,seed){
+  var fx=x/sc, fy=y/sc, x0=Math.floor(fx), y0=Math.floor(fy), tx=fx-x0, ty=fy-y0;
+  function h(a,b){ return hash(a*7+seed*131,b*13+seed*17); }
+  var sx=tx*tx*(3-2*tx), sy=ty*ty*(3-2*ty);
+  var a=h(x0,y0), b=h(x0+1,y0), c=h(x0,y0+1), d=h(x0+1,y0+1);
+  return a+(b-a)*sx+(c-a)*sy+(a-b-c+d)*sx*sy;
+}
+function genTerrain(z,reg){
+  var m=new Uint8Array(ZC*ZR), R=seeded(9001+z*7919), x, y, i;
+  function inb(x,y){ return x>=2&&x<=ZC-3&&y>=1&&y<=ZR-2; }
+  function S(x,y,v){ x=Math.round(x); y=Math.round(y); if(inb(x,y)) m[y*ZC+x]=v; }
+  function Gt(x,y){ return inb(x,y)?m[y*ZC+x]:1; }
+  function ellF(cx,cy,rx,ry,v){ for(var yy=Math.floor(cy-ry);yy<=Math.ceil(cy+ry);yy++) for(var xx=Math.floor(cx-rx);xx<=Math.ceil(cx+rx);xx++){
+    var d=((xx-cx)*(xx-cx))/(rx*rx)+((yy-cy)*(yy-cy))/(ry*ry); if(d<=1) S(xx,yy,v); } }
+  function rectF(x0,y0,w,h,v){ for(var yy=y0;yy<y0+h;yy++) for(var xx=x0;xx<x0+w;xx++) S(xx,yy,v); }
+  function pathTo(x0,y0,x1,y1){
+    var xx=x0, yy=y0;
+    function put(){ if(yy===ROAD||yy===ROAD-1) return; var c=Gt(xx,yy); if(c===2) S(xx,yy,6); else if(c!==4&&c!==6) S(xx,yy,3); }
+    put(); while(xx!==x1){ xx+=(x1>xx?1:-1); put(); } while(yy!==y1){ yy+=(y1>yy?1:-1); put(); }
+  }
+  var near=function(y){ return Math.abs(y-(ROAD-0.5)); };
+
+  if(reg==='r1'){                                   // 숲: 나무 군락 · 꽃밭 · 연못 두 개
+    for(y=1;y<=ZR-2;y++) for(x=2;x<=ZC-3;x++){
+      var n=vnoise(x,y,5,1)*0.7+vnoise(x,y,2.5,2)*0.3, edge=Math.min(y-1,ZR-2-y);
+      var thr=edge<=1?0.34:(near(y)<=3?0.82:0.6);
+      S(x,y,n>thr?1:(n<0.3?5:0));
+    }
+    ellF(40,5,7.5,3.4,0); ellF(40,5,5.2,2.2,2);
+    ellF(14,19,6,3,0); ellF(14,19,3.8,1.7,2);
+    pathTo(21,ROAD+1,21,16); pathTo(21,16,15,16);
+    pathTo(33,ROAD-2,33,8); pathTo(33,8,38,8);
+  } else if(reg==='r2'){                            // 동굴: 자연 동굴 벽(셀룰러 오토마타) · 지하 호수
+    for(y=1;y<=ZR-2;y++) for(x=2;x<=ZC-3;x++) S(x,y,R()<0.47?1:0);
+    for(var it=0;it<4;it++){
+      var nm=new Uint8Array(m);
+      for(y=1;y<=ZR-2;y++) for(x=2;x<=ZC-3;x++){
+        var cnt=0; for(var dy=-1;dy<=1;dy++) for(var dx=-1;dx<=1;dx++){ if(!dx&&!dy) continue; if(Gt(x+dx,y+dy)===1) cnt++; }
+        nm[y*ZC+x]=cnt>=5?1:(cnt<=3?0:m[y*ZC+x]);
+      }
+      m=nm;
+    }
+    for(x=2;x<=ZC-3;x++){ if(R()<0.85) S(x,ROAD-2,0); if(R()<0.85) S(x,ROAD+1,0); }
+    for(y=1;y<=ZR-2;y++) for(x=2;x<=ZC-3;x++)
+      if(Gt(x,y)===0&&near(y)>3.5&&vnoise(x,y,4,5)>0.68) S(x,y,2);
+  } else if(reg==='r3'){                            // 협곡: 들쭉날쭉한 절벽 · 바위 기둥 · 오아시스
+    for(x=2;x<=ZC-3;x++){
+      var top=1+Math.floor(vnoise(x,0,6,7)*6), bot=ZR-2-Math.floor(vnoise(x,40,6,8)*6);
+      for(y=1;y<=ZR-2;y++) S(x,y,(y<=top||y>=bot)?1:0);
+    }
+    for(i=0;i<8;i++){
+      var cx=8+R()*40, cy=(i%2)?ROAD-5-R()*2:ROAD+4+R()*2, r=1+R()*1.4;
+      if(cx>38&&cx<50&&cy>ROAD) continue;
+      ellF(cx,cy,r+0.6,r,1);
+    }
+    ellF(44,17,6,3,5); ellF(44,17,3.4,1.6,2);
+    pathTo(37,ROAD+1,37,16); pathTo(37,16,40,16);
+  } else if(reg==='r4'){                            // 아레나 도시: 거리 · 집 · 분수 광장 · 원형 경기장
+    for(x=6;x<=ZC-7;x++){ S(x,5,3); if(x<27||x>44) S(x,19,3); }
+    [10,26,45].forEach(function(sx){ for(y=2;y<=ZR-3;y++) if(!(sx===45&&y>ROAD+1&&y<22)) S(sx,y,3); });
+    var bx=[[3,9],[12,25],[28,44],[47,ZC-4]], by=[[2,4],[7,ROAD-3],[ROAD+2,18],[20,ZR-3]];
+    bx.forEach(function(X,bi){ by.forEach(function(Y,bj){
+      if(bi===2&&bj>=2) return;                     // 경기장 자리
+      if(bi===0&&bj===1) return;                    // 입구 캠프
+      if(R()<0.22){ rectF(X[0],Y[0],X[1]-X[0]+1,Y[1]-Y[0]+1,5); return; }   // 공원
+      var xx=X[0];
+      while(xx<=X[1]-2){ var w=3+Math.floor(R()*2), h=Math.min(3,Y[1]-Y[0]+1);
+        if(xx+w-1>X[1]) break; rectF(xx,Y[0],w,h,1); xx+=w+1+Math.floor(R()*2); }
+    }); });
+    rectF(15,7,7,3,4); S(18,8,2);                   // 분수 광장
+    var scx=36, scy=ROAD+6.5;                       // 원형 경기장
+    for(y=ROAD+2;y<=ZR-2;y++) for(x=28;x<=44;x++){
+      var d=Math.sqrt(((x-scx)*(x-scx))/(7.8*7.8)+((y-scy)*(y-scy))/(4.8*4.8));
+      if(d>1) continue;
+      var gate=(Math.abs(y-scy)<1.2)||(Math.abs(x-scx)<1.2&&y<scy);
+      if(d>0.78) S(x,y,gate?4:1); else if(d>0.5) S(x,y,3); else S(x,y,5);
+    }
+  } else {                                          // 성채: 방 · 문 · 기둥 대회랑 · 옥좌 광장
+    var vx=[10,19,28,37,46], hy=[ROAD-4,ROAD+3];
+    vx.forEach(function(wx){
+      for(y=1;y<=hy[0];y++) S(wx,y,1);
+      for(y=hy[1];y<=ZR-2;y++) S(wx,y,1);
+    });
+    hy.forEach(function(wy){ for(x=2;x<=ZC-3;x++) S(x,wy,1); });
+    var cols=[2].concat(vx).concat([ZC-2]);
+    for(i=0;i<cols.length-1;i++){                   // 가로벽마다 방 하나당 문 1개
+      var a0=cols[i]+1, a1=cols[i+1]-1;
+      hy.forEach(function(wy){ var dx0=a0+1+Math.floor(R()*Math.max(1,a1-a0-2)); S(dx0,wy,0); S(dx0+1,wy,0); });
+    }
+    vx.forEach(function(wx){                        // 세로벽에도 문
+      var d1=2+Math.floor(R()*(hy[0]-3)); S(wx,d1,0);
+      var d2=hy[1]+1+Math.floor(R()*(ZR-3-hy[1]-1)); S(wx,d2,0);
+    });
+    for(x=6;x<=ZC-6;x+=6){ S(x,ROAD-3,1); S(x,ROAD+2,1); }   // 기둥
+    for(i=0;i<cols.length-1;i++){
+      var rx0=cols[i]+1, rx1=cols[i+1]-1, pick=R();
+      if(pick<0.3) rectF(rx0+1,2,rx1-rx0-1,hy[0]-3,4);
+      else if(pick<0.45){ S(Math.floor((rx0+rx1)/2),Math.floor((ROAD+3+ZR-2)/2),2); S(Math.floor((rx0+rx1)/2)+1,Math.floor((ROAD+3+ZR-2)/2),2); }
+    }
+  }
+  // 입구 캠프 광장
+  rectF(2,ROAD-3,7,6,4);
+  // 보스 앞마당 + 길로 이어지는 참배로
+  var bp=bossPos(z);
+  rectF(bp.c-2,bp.r-1,5,3,4);
+  var yy=bp.r+(bp.r<ROAD?2:-2);
+  while(yy!==ROAD&&yy!==ROAD-1){ var c0=Gt(bp.c,yy); S(bp.c,yy,c0===2?6:(c0===4?4:3)); yy+=(yy<ROAD?1:-1); }
+  // 대로
+  for(x=2;x<=ZC-3;x++){ S(x,ROAD-1,0); S(x,ROAD,0); }
+  // 모든 빈 땅을 입구와 연결 (고립된 곳은 길을 뚫는다)
+  function pass(c){ return c!==1&&c!==2; }
+  for(var guard=0;guard<80;guard++){
+    var seen=new Uint8Array(ZC*ZR), q=[3+ROAD*ZC], h=0; seen[q[0]]=1;
+    while(h<q.length){ var p=q[h++], px0=p%ZC, py0=(p/ZC)|0;
+      [[1,0],[-1,0],[0,1],[0,-1]].forEach(function(dd){ var nx=px0+dd[0], ny=py0+dd[1];
+        if(!inb(nx,ny)) return; var k=ny*ZC+nx; if(seen[k]||!pass(m[k])) return; seen[k]=1; q.push(k); }); }
+    var lost=-1;
+    for(i=0;i<ZC*ZR;i++){ var ix=i%ZC, iy=(i/ZC)|0; if(inb(ix,iy)&&pass(m[i])&&!seen[i]){ lost=i; break; } }
+    if(lost<0) break;
+    var lx=lost%ZC, ly=(lost/ZC)|0, st=ly<ROAD?1:-1;
+    while(!seen[ly*ZC+lx]&&ly!==ROAD){ var cc=m[ly*ZC+lx]; if(cc===1) m[ly*ZC+lx]=3; else if(cc===2) m[ly*ZC+lx]=6; ly+=st; }
+  }
+  TM[z]=m;
+}
 
 /* ── 입구에서 걸어서 갈 수 있는 칸 (BFS) ── */
 function walkable(z){
@@ -84,6 +221,7 @@ function qState(id){ return ((G.save&&G.save['문제상태'])||{})[id]; }
 /* ── 엔티티 배치 (원본 initEntities 대체) ── */
 initEntities=function(){
   entities=[];
+  G.regions.forEach(function(reg,z){ genTerrain(z,reg.id); });
   G.regions.forEach(function(reg,z){
     var base=z*ZC, th=THEME[reg.id]||THEME.r1;
     var bp=bossPos(z);
@@ -165,5 +303,5 @@ nextRegionQuestion=function(regionId,cur){
   return pick(free);
 };
 
-try{ var ver=document.getElementById('ver'); if(ver) ver.textContent='빌드 v13 넓은 섬'; }catch(e){}
+try{ var ver=document.getElementById('ver'); if(ver) ver.textContent='빌드 v15 설계된 섬'; }catch(e){}
 })();
