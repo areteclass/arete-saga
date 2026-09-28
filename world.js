@@ -303,5 +303,155 @@ nextRegionQuestion=function(regionId,cur){
   return pick(free);
 };
 
-try{ var ver=document.getElementById('ver'); if(ver) ver.textContent='빌드 v15 설계된 섬'; }catch(e){}
+
+/* ═══════════════ 군도 지도 리뉴얼 (v16) ═══════════════
+   - 게임과 같은 도트 스타일의 섬 5개 (숲·동굴·협곡·아레나·성채)
+   - 잠긴 섬은 '엔트로피의 안개'가 덮고 있다가, 앞 섬을 클리어하면 걷힘
+   - 뱃길 점선, 현재 위치 화살표, 구출한 섬의 코어 빛과 깃발
+   - 라벨이 섬을 가리지 않게 재배치 + 진행 막대 */
+var MW=202, MH=150;
+var ISL=[[34,60],[76,104],[108,46],[144,98],[178,42]];
+ISLE=ISL.map(function(p){ return {x:p[0]*4,y:p[1]*4}; });
+var mapLo=document.createElement('canvas'); mapLo.width=MW; mapLo.height=MH;
+var ml=mapLo.getContext('2d');
+var ISC={};
+function mpx(g,x,y,c,w,h){ g.fillStyle=c; g.fillRect(Math.round(x),Math.round(y),w||1,h||1); }
+var ISL_PAL={
+  r1:{top:'#5aa84a',hi:'#7cc85a',rim:'#e0cc8a',cliff:'#6a4a2e',cd:'#4a321e'},
+  r2:{top:'#5a5070',hi:'#7a70a0',rim:'#8a8098',cliff:'#3a3050',cd:'#241e34'},
+  r3:{top:'#d09a58',hi:'#e8b878',rim:'#f0d8a0',cliff:'#9a6232',cd:'#6a3e1c'},
+  r4:{top:'#4f9a58',hi:'#6fbc70',rim:'#e0cc8a',cliff:'#6a5a4a',cd:'#4a3e32'},
+  r5:{top:'#4a4058',hi:'#6a5f7e',rim:'#7a6e8e',cliff:'#2e2640',cd:'#1c1628'}
+};
+function buildIsland(reg,z){
+  var key=reg+z; if(ISC[key]) return ISC[key];
+  var W=52, H=42, c=document.createElement('canvas'); c.width=W; c.height=H;
+  var g=c.getContext('2d'), p=ISL_PAL[reg]||ISL_PAL.r1, cx=26, cy=17;
+  function inside(x,y){ var dx=(x-cx)/19, dy=(y-cy)/11, a=Math.atan2(dy,dx);
+    var rr=1+0.11*Math.sin(3*a+z*1.7)+0.07*Math.sin(5*a+z); return Math.sqrt(dx*dx+dy*dy)/rr; }
+  var x, y;
+  for(y=0;y<H;y++) for(x=0;x<W;x++){                    // 절벽(두께)
+    var up=false; for(var k=1;k<=6;k++) if(inside(x,y-k)<=1){ up=true; break; }
+    if(up&&inside(x,y)>1) mpx(g,x,y,(y%3===0)?p.cd:p.cliff);
+  }
+  for(y=0;y<H;y++) for(x=0;x<W;x++){                    // 윗면
+    var d=inside(x,y); if(d>1) continue;
+    var col=d>0.86?p.rim:p.top;
+    if(inside(x,y-1)>1) col=p.hi;
+    if(d<=0.86&&hash(x*7+z,y*3)<0.12) col=p.hi;
+    mpx(g,x,y,col);
+  }
+  function tree(tx,ty){ mpx(g,tx,ty-3,'#2f7a34'); mpx(g,tx-1,ty-2,'#2f7a34',3,1); mpx(g,tx-1,ty-1,'#245e28',3,1); mpx(g,tx,ty-3,'#7cc85a'); mpx(g,tx,ty,'#5a3a1e'); }
+  if(reg==='r1'){
+    [[14,14],[18,11],[22,15],[30,10],[35,13],[39,16],[17,19],[33,20],[26,9]].forEach(function(t){ tree(t[0],t[1]); });
+    mpx(g,24,18,'#3a78c0',5,2); mpx(g,25,18,'#8fc8f0',2,1);
+  } else if(reg==='r2'){
+    for(var i=0;i<9;i++){ mpx(g,20-i+9,6+i,'#6a6088',1+i*2,1); }                 // 바위산
+    mpx(g,26,6,'#b8b0d0'); mpx(g,25,7,'#b8b0d0',2,1);
+    mpx(g,24,12,'#120c1c',5,3); mpx(g,25,11,'#120c1c',3,1);                     // 동굴 입구
+    [[14,16,'#8fe8ff'],[36,15,'#c98cff'],[33,19,'#8fe8ff'],[17,20,'#c98cff']].forEach(function(q){ mpx(g,q[0],q[1]-1,q[2]); mpx(g,q[0]-1,q[1],q[2],3,1); });
+  } else if(reg==='r3'){
+    for(y=0;y<H;y++) for(x=0;x<W;x++){ var dd=inside(x,y); if(dd<0.62&&dd>0.5) mpx(g,x,y,'#b8844a'); if(dd<0.35&&dd>0.26) mpx(g,x,y,'#b8844a'); }
+    [[13,15],[38,17],[30,21]].forEach(function(q){ mpx(g,q[0],q[1]-2,'#4f8a3a',1,3); mpx(g,q[0]-1,q[1]-1,'#4f8a3a'); mpx(g,q[0]+1,q[1]-2,'#4f8a3a'); });
+  } else if(reg==='r4'){
+    g.fillStyle='#d8cfa8'; g.beginPath(); g.ellipse(26,15,9,5,0,0,6.3); g.fill();
+    g.fillStyle='#b0a578'; g.beginPath(); g.ellipse(26,15,9,5,0,0,6.3); g.fill();
+    g.fillStyle='#c9a060'; g.beginPath(); g.ellipse(26,15,6.5,3.2,0,0,6.3); g.fill();
+    g.fillStyle='#5a9a4a'; g.beginPath(); g.ellipse(26,15,4.5,2,0,0,6.3); g.fill();
+    for(var a2=0;a2<10;a2++){ var an=a2/10*6.28; mpx(g,26+Math.cos(an)*9,15+Math.sin(an)*5-1,'#8a7a4a',1,2); }
+    [[12,18],[40,18],[15,11]].forEach(function(q){ mpx(g,q[0],q[1],'#4a5a7a',3,2); mpx(g,q[0],q[1]+2,'#e0d8c8',3,1); });
+  } else {
+    mpx(g,19,8,'#6a5f7e',14,9); mpx(g,19,8,'#8a7e9e',14,1);                     // 성벽
+    mpx(g,16,4,'#6a5f7e',4,13); mpx(g,32,4,'#6a5f7e',4,13); mpx(g,24,2,'#6a5f7e',4,6);
+    mpx(g,16,3,'#c03a3a',4,1); mpx(g,32,3,'#c03a3a',4,1); mpx(g,24,1,'#c03a3a',4,1);
+    mpx(g,17,2,'#c03a3a',2,1); mpx(g,33,2,'#c03a3a',2,1); mpx(g,25,0,'#c03a3a',2,1);
+    [[18,7],[34,7],[25,5],[22,11],[29,11]].forEach(function(q){ mpx(g,q[0],q[1],'#ffca4b'); });
+    mpx(g,25,13,'#2a2036',2,4);
+  }
+  return (ISC[key]=c);
+}
+var FOG=[]; for(var fi=0;fi<12;fi++) FOG.push({ox:(hash(fi,21)-0.5)*30,oy:(hash(fi,22)-0.5)*14-2,r:5+hash(fi,23)*4,ph:fi*1.3});
+function drawLock(g,x,y){
+  mpx(g,x-2,y-4,'#d8c070',1,3); mpx(g,x+2,y-4,'#d8c070',1,3); mpx(g,x-1,y-5,'#d8c070',3,1);
+  mpx(g,x-3,y-1,'#e8c860',7,5); mpx(g,x-3,y-1,'#fff0a0',7,1); mpx(g,x,y+1,'#6a4a10',1,2);
+}
+drawWorldMap=function(){
+  var cv=document.getElementById('wmap-canvas'); if(!cv) return;
+  cv.style.imageRendering='pixelated';
+  var g=ml, t=performance.now(), cl=G.save['클리어지역']||[];
+  for(var y=0;y<MH;y++){ var f=y/MH; g.fillStyle='rgb('+Math.round(30+10*(1-f))+','+Math.round(78+30*(1-f))+','+Math.round(130+36*(1-f))+')'; g.fillRect(0,y,MW,1); }
+  for(var i=0;i<70;i++){ var wx=((hash(i,11)*MW+t/90*(0.5+hash(i,12)))%(MW+10))-5, wy=hash(i,13)*MH, on=((t/600+i*0.7)%3)<2;
+    if(on) mpx(g,wx,wy,'rgba(160,210,255,.35)',3,1); }
+  // 뱃길
+  for(var z=1;z<ISL.length;z++){
+    var A=ISL[z-1], B=ISL[z], open=cl.indexOf(G.regions[z-1].id)!==-1;
+    var mx=(A[0]+B[0])/2, my=(A[1]+B[1])/2+(z%2?-18:18);
+    for(var s=0;s<=1;s+=0.02){
+      var bx=(1-s)*(1-s)*A[0]+2*(1-s)*s*mx+s*s*B[0], by=(1-s)*(1-s)*A[1]+2*(1-s)*s*my+s*s*B[1];
+      var ph=Math.floor(s*50+(open?t/150:0))%3;
+      if(ph===0) mpx(g,bx,by,open?'#ffd86a':'rgba(255,255,255,.35)',2,1);
+    }
+  }
+  // 섬
+  G.regions.forEach(function(reg,z){
+    var P=ISL[z], cleared=cl.indexOf(reg.id)!==-1, reach=(z===0)||(cl.indexOf(G.regions[z-1].id)!==-1);
+    g.fillStyle='rgba(120,200,240,.35)'; g.beginPath(); g.ellipse(P[0],P[1]+3,24,14,0,0,6.3); g.fill();
+    var fr=Math.floor(t/400)%2;
+    g.fillStyle='rgba(230,248,255,.55)';
+    for(var a=0;a<40;a++){ if((a+fr)%3) continue; var an=a/40*6.283; mpx(g,P[0]+Math.cos(an)*21,P[1]+3+Math.sin(an)*12,'rgba(230,248,255,.6)'); }
+    var isl=buildIsland(reg.id,z);
+    g.drawImage(isl,Math.round(P[0]-26),Math.round(P[1]-17));
+    if(!reach){
+      for(var q=0;q<FOG.length;q++){ var fo=FOG[q], dx=Math.sin(t/2200+fo.ph)*3;
+        g.fillStyle=q%2?'rgba(170,165,195,.9)':'rgba(140,135,170,.9)';
+        g.beginPath(); g.arc(Math.round(P[0]+fo.ox+dx),Math.round(P[1]+fo.oy),fo.r,0,6.3); g.fill(); }
+      drawLock(g,P[0],P[1]);
+    }
+    if(cleared){
+      var th=THEME[reg.id]||{}, gl=0.5+0.5*Math.sin(t/300);
+      g.globalAlpha=0.35+gl*0.3; g.fillStyle='#ffe98a'; g.beginPath(); g.arc(P[0],P[1]-16,5+gl,0,6.3); g.fill(); g.globalAlpha=1;
+      mpx(g,P[0]-1,P[1]-17,'#ffffff',3,3);
+      mpx(g,P[0]+14,P[1]-16,'#e8e0d0',1,9); mpx(g,P[0]+15,P[1]-16+(Math.floor(t/250)%2),'#66e08a',4,3);
+    }
+    if(z===curZone){
+      var bob=Math.floor(t/220)%2;
+      var ax=P[0], ay=P[1]-(cleared?26:22)-bob;
+      mpx(g,ax-3,ay,'#ffca4b',7,1); mpx(g,ax-2,ay+1,'#ffca4b',5,1); mpx(g,ax-1,ay+2,'#ffca4b',3,1); mpx(g,ax,ay+3,'#ffca4b',1,1);
+      mpx(g,ax-3,ay-1,'#7a4a00',7,1);
+    }
+  });
+  // 나침반
+  var cx0=12, cy0=MH-14;
+  mpx(g,cx0,cy0-7,'#ffe070',1,6); mpx(g,cx0,cy0+2,'#e8e0d0',1,5); mpx(g,cx0-6,cy0,'#e8e0d0',5,1); mpx(g,cx0+2,cy0,'#e8e0d0',5,1);
+  mpx(g,cx0-1,cy0-1,'#ffffff',3,3); mpx(g,cx0-1,cy0-11,'#ffe070',3,1); mpx(g,cx0,cy0-10,'#ffe070');
+  var c2=cv.getContext('2d'); c2.imageSmoothingEnabled=false;
+  c2.drawImage(mapLo,0,0,cv.width,cv.height);
+};
+renderMapNodes=function(){
+  var cl=G.save['클리어지역']||[];
+  document.getElementById('wmap-prog').textContent='코어 '+cl.length+'/5 구출';
+  var nb=document.getElementById('wmap-nodes'); nb.innerHTML='';
+  G.regions.forEach(function(reg,z){
+    var P=ISL[z], cleared=cl.indexOf(reg.id)!==-1, reach=(z===0)||(cl.indexOf(G.regions[z-1].id)!==-1), here=(z===curZone);
+    var normals=G.questions.filter(function(q){ return q.region===reg.id&&q.type==='normal'; });
+    var solved=normals.filter(function(q){ var st=(G.save['문제상태']||{})[q.id]; return st&&st.solved; }).length;
+    var pct=normals.length?Math.round(solved/normals.length*100):0;
+    var bc=here?'#ffca4b':(cleared?'#66e08a':(reach?'#8a7ab8':'#3a3448'));
+    var status=cleared?'<span style="color:#66e08a">✔ 코어 구출</span>'
+      :(reach?('<div style="display:flex;align-items:center;gap:4px"><div style="flex:1;height:4px;background:#241c3c;border-radius:2px;overflow:hidden"><i style="display:block;height:100%;width:'+pct+'%;background:#37e0cf"></i></div><span style="color:#37e0cf">'+pct+'%</span></div>')
+      :'<span style="color:#8a84a0">안개에 잠김</span>');
+    var hit=document.createElement('div');
+    hit.style.cssText='position:absolute;left:'+((P[0]-22)/MW*100)+'%;top:'+((P[1]-18)/MH*100)+'%;width:'+(44/MW*100)+'%;height:'+(34/MH*100)+'%;cursor:'+(reach?'pointer':'default');
+    var d=document.createElement('div');
+    d.style.cssText='position:absolute;transform:translate(-50%,0);left:'+(P[0]/MW*100)+'%;top:'+((P[1]+16)/MH*100)+'%;cursor:'+(reach?'pointer':'default');
+    d.innerHTML='<div style="background:rgba(16,11,26,.92);border:2px solid '+bc+';border-radius:8px;padding:3px 8px;min-width:84px;'+
+      'box-shadow:0 3px 0 rgba(0,0,0,.45)'+(here?',0 0 10px rgba(255,202,75,.45)':'')+';font-size:10.5px;color:'+(reach?'#efeaf7':'#8a84a0')+'">'+
+      '<div style="white-space:nowrap"><b style="display:inline-block;width:15px;height:15px;line-height:15px;text-align:center;border-radius:50%;background:'+bc+';color:#140c1e;font-size:9px;margin-right:4px">'+(z+1)+'</b>'+reg.name+(here?' <span style="color:#ffca4b">◀</span>':'')+'</div>'+
+      '<div style="margin-top:2px;font-size:9.5px">'+status+'</div></div>';
+    if(reach){ d.onclick=function(){ warpToIsland(z); }; hit.onclick=function(){ warpToIsland(z); }; }
+    nb.appendChild(hit); nb.appendChild(d);
+  });
+};
+
+setTimeout(function(){ try{ var ver=document.getElementById('ver'); if(ver) ver.textContent='빌드 v16 군도 지도'; }catch(e){} },0);
 })();
