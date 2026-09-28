@@ -12,6 +12,7 @@ if(typeof drawGround!=='function'||typeof drawHero!=='function'){ console.warn('
 
 var ART={ curE:null, cache:{} };
 window.ART=ART;
+ART.v=14;
 var OUTLINE='#140c1e';
 
 /* ───────────── 기본 도구 ───────────── */
@@ -310,13 +311,14 @@ var LEGS=[
  ["....PPp...PPp...","....KKk...KKk...","...KKKk..KKKk..."],
  ["...PPp....PPp...","...KKk.....KKk..","..KKKk.....KKKk."],
  [".....PPpPPp.....",".....KKkKKk.....","....KKKkKKKk...."] ];
-var CHAR_OV={
+var HAIR_OV={
  taro:[{x:0,y:4,r:["..AAAAAAAAAAA...","AA..............","A..............."]}],
- mir: [{x:0,y:-1,r:["....h..hh..h...."]},{x:0,y:11,r:["..TTTTTTTTTTTT..","..TT........TT.."]}],
+ mir: [{x:0,y:-1,r:["....h..hh..h...."]}],
  hana:[{x:0,y:2,r:[".h..............","hHh.............","hHh.............","hHh.............",".hH.............",".hh.............","..h............."]}],
  yuri:[{x:0,y:7,r:["h..............h","hH............Hh","hH............Hh","hHh..........hHh",".hh..........hh."]},{x:0,y:2,r:["...........AA...","..........AAA..."]}],
  leon:[{x:0,y:3,r:[".TTTTTTTTTTTTTT.",".......A........"]}]
 };
+var BODY_OV={ mir:[{x:0,y:11,r:["..TTTTTTTTTTTT..","..TT........TT.."]}] };
 var HAT={
  wizard:{y:-6,r:["..........xX....",".........xXX....","........xXXX....",".......xXXXXX...","......xXXXYXXX..",".....xXXXXXXXXX.","..xxxxXXXXXXXXXx","..xxxxxxxxxxxxx."]},
  crown: {y:-3,r:["...Y...Y...Y....","...X..XXX..X....","...XXXXXXXXX....","...XYXXYXXYX....","...xxxxxxxxx...."]},
@@ -346,14 +348,15 @@ var AURA_COL={cos_aura1:'#ff7a2e',cos_aura2:'#8fd0ff',cos_aura3:'#c05aff',cos_au
 
 var HW=28, HH=27, HOX=6, HOY=7;
 function heroSprite(id,frame,eq){
-  var key='hero|'+id+'|'+frame+'|'+(eq.w?eq.w.id:'')+'|'+(eq.a?eq.a.id:'')+'|'+(eq.acc?eq.acc.id:'')+'|'+(eq.hat?eq.hat.id:'')+'|'+(eq.cape?eq.cape.id:'')+'|'+(eq.dye||'');
+  var key='hero|'+id+'|'+frame+'|'+(eq.w?eq.w.id:'')+'|'+(eq.a?eq.a.id:'')+'|'+(eq.acc?eq.acc.id:'')+'|'+(eq.hat?eq.hat.id:'')+'|'+(eq.cape?eq.cape.id:'')+'|'+(eq.dye||'')+'|'+(eq.custom?JSON.stringify(eq.custom):'');
   if(ART.cache[key]) return ART.cache[key];
   var c=mk(HW,HH), g=c.getContext('2d');
   var base=(typeof HERO!=='undefined'&&HERO[id])||{skin:'#f4c896',hair:'#6a4420',suit:'#e0a83c',accent:'#fff2c0',trim:'#a86e18'};
   var suit=base.suit, trim=base.trim, robe=0;
   if(eq.dye){ suit=eq.dye; trim=sh(eq.dye,0.6); }
   else if(eq.a&&typeof AART!=='undefined'&&AART[eq.a.id]){ suit=AART[eq.a.id][0]; trim=AART[eq.a.id][1]; robe=AART[eq.a.id][2]; }
-  var pal={H:base.hair,h:sh(base.hair,0.68),S:base.skin,s:sh(base.skin,0.84),E:'#2a2030',w:'#ffffff',m:'#c86060',
+  var cu=eq.custom||{}, hair=cu.hair||base.hair, skin=cu.skin||base.skin;
+  var pal={H:hair,h:sh(hair,0.68),S:skin,s:sh(skin,0.84),E:cu.eye?sh(cu.eye,0.55):'#2a2030',w:'#ffffff',m:'#c86060',
     B:suit,b:sh(suit,0.72),L:base.accent,T:trim,A:base.accent,P:'#3a3050',p:'#2a2238',K:'#5a3a22',k:'#7a5232'};
   function lay(o,p){ paint(g,o.r,HOX+(o.x||0),HOY+o.y,p); }
   // 망토/날개 (몸 뒤)
@@ -364,7 +367,8 @@ function heroSprite(id,frame,eq){
   // 몸
   paint(g,HERO_BODY,HOX,HOY,pal);
   paint(g,LEGS[frame]||LEGS[0],HOX,HOY+16,pal);
-  (CHAR_OV[id]||[]).forEach(function(o){ lay(o,pal); });
+  (HAIR_OV[cu.style||id]||HAIR_OV[id]||[]).forEach(function(o){ lay(o,pal); });
+  (BODY_OV[id]||[]).forEach(function(o){ lay(o,pal); });
   if(robe) lay(ROBE,pal);
   // 장신구
   if(eq.acc){
@@ -534,6 +538,8 @@ drawFire=function(g,cx,cy){
 /* 몬스터 방향 전환용: 지금 그리는 엔티티 기억 */
 var _des=drawEntitySprite;
 drawEntitySprite=function(g,e,cx,cy,T){ ART.curE=e; try{ _des(g,e,cx,cy,T); } finally { ART.curE=null; } };
+
+ART.lib={mk:mk,paint:paint,outline:outline,sh:sh,HAT_OF:HAT_OF,HAIR_OV:HAIR_OV};
 
 /* 이미 그려진 아바타(캐릭터 선택·랭킹)도 새 도트로 다시 그리기 */
 setTimeout(function(){ try{ if(typeof paintHeroAvatars==='function') paintHeroAvatars(document); }catch(e){} },300);
