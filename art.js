@@ -12,7 +12,7 @@ if(typeof drawGround!=='function'||typeof drawHero!=='function'){ console.warn('
 
 var ART={ curE:null, cache:{} };
 window.ART=ART;
-ART.v=14;
+ART.v=27;
 var OUTLINE='#140c1e';
 
 /* ───────────── 기본 도구 ───────────── */
@@ -409,7 +409,7 @@ var AURA_COL={cos_aura1:'#ff7a2e',cos_aura2:'#8fd0ff',cos_aura3:'#c05aff',cos_au
 
 var HW=28, HH=27, HOX=6, HOY=7;
 function heroSprite(id,frame,eq){
-  var key='hero|'+id+'|'+frame+'|'+(eq.w?eq.w.id:'')+'|'+(eq.a?eq.a.id:'')+'|'+(eq.acc?eq.acc.id:'')+'|'+(eq.hat?eq.hat.id:'')+'|'+(eq.cape?eq.cape.id:'')+'|'+(eq.dye||'')+'|'+(eq.custom?JSON.stringify(eq.custom):'');
+  var key='hero|'+id+'|'+frame+'|'+(eq.w?eq.w.id:'')+'|'+(eq.a?eq.a.id:'')+'|'+(eq.acc?eq.acc.id:'')+'|'+(eq.hat?eq.hat.id:'')+'|'+(eq.cape?eq.cape.id:'')+'|'+(eq.dye||'')+'|'+(eq.custom?JSON.stringify(eq.custom):'')+'|'+(eq.noW?'nw':'');
   if(ART.cache[key]) return ART.cache[key];
   var c=mk(HW,HH), g=c.getContext('2d');
   var base=(typeof HERO!=='undefined'&&HERO[id])||{skin:'#f4c896',hair:'#6a4420',suit:'#e0a83c',accent:'#fff2c0',trim:'#a86e18'};
@@ -445,7 +445,7 @@ function heroSprite(id,frame,eq){
     lay(HAT[hs[0]],hs[1]);
   }
   // 무기 (앞)
-  if(eq.w&&typeof WART!=='undefined'){
+  if(eq.w&&!eq.noW&&typeof WART!=='undefined'){
     var wa=WART[eq.w.id]||['#6a4a26','#c9ccd8',1,'s'];
     var bl=(wa[1]==='RAINBOW')?'#ff8ae0':wa[1], hi=(wa[1]==='RAINBOW')?'#fff0ff':sh(bl,1.35), hd=wa[0], gd='#e0c060';
     function P(x,y,col){ dot(g,HOX+x,HOY+y,col); }
