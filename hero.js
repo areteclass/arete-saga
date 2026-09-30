@@ -84,18 +84,18 @@ function outline(c,col){
 }
 
 /* ═══════════════ 꾸미기 데이터 ═══════════════ */
-var DEF_EYE={taro:'#4a3228',mir:'#4a7ad0',hana:'#c83030',yuri:'#9a4ad0',leon:'#3a8ad8'};
+var DEF_EYE={taro:'#4a3228',mir:'#3a8a4a',hana:'#c83030',yuri:'#9a4ad0',leon:'#3a8ad8'};
 /* 직업별 기본 디자인 (그림 시안 기준) */
 var CLASS_LOOK={
   taro:{outfit:'coat',   style:'hero',  pants:'#2a2a3a'},   // 아레테: 털 칼라 파란 코트
-  mir: {outfit:'knight', style:'short', pants:'#5a6478'},   // 포르사: 은빛 판금 기사
+  mir: {outfit:'knight', style:'messy', pants:'#3a3a48'},   // 포르사: 은빛 판금 + 초록 휘장 기사
   hana:{outfit:'rogue',  style:'hana',  pants:'#2a1e24'},   // 아길레: 붉은 스카프 무투가
   yuri:{outfit:'witch',  style:'yuri',  pants:'#2a2050'},   // 리커버: 마녀 모자 · 보라 로브
   leon:{outfit:'mystic', style:'messy', pants:'#2a2030'}    // 멘타: 흑백 로브 술사
 };
 if(typeof HERO!=='undefined'){
   HERO.taro={skin:'#f4c896',hair:'#3a2a22',suit:'#2e5aa8',accent:'#f4f0ea',trim:'#6a4428'};
-  HERO.mir ={skin:'#f0c090',hair:'#aab6d6',suit:'#b8c0d0',accent:'#2e5aa8',trim:'#7a8498'};
+  HERO.mir ={skin:'#f0c090',hair:'#6a4420',suit:'#c8ccd6',accent:'#4a7a3a',trim:'#8a92a4'};
   HERO.hana={skin:'#f4c896',hair:'#d0302a',suit:'#2a2030',accent:'#d0302a',trim:'#6a4428'};
   HERO.yuri={skin:'#f8d8c0',hair:'#d8d4e8',suit:'#4a3a9a',accent:'#f4f0ea',trim:'#e0b040'};
   HERO.leon={skin:'#f0c8a0',hair:'#b8b0b0',suit:'#f0ece4',accent:'#2a2030',trim:'#e0b040'};
@@ -253,6 +253,8 @@ function buildShow(id,eq,f){
   } else if(eq.cape){
     var cc=cu.cape||CAPES[eq.cape.id]||'#c03a3a';
     S(cc,poly(up([16,26,32,26,33,48,28,78,18,84,5+sw,80,-2+sw,64,5,44],U)));
+  } else if(CL.outfit==='knight'&&!(eq.a&&AART[eq.a.id])){
+    S(cu.cape||base.accent,poly(up([16,26,32,26,33,48,28,76,18,80,6+sw,76,0+sw,62,6,44],U)));
   }
   /* 2) 뒷머리 */
   hairBack(S,style,hair,U,sw);
@@ -578,6 +580,6 @@ drawSelBig=function(id){
   })();
 };
 
-function setVer(){ try{ var v=document.getElementById('ver'); if(v) v.textContent='빌드 v22 새 디자인'; }catch(e){} }
+function setVer(){ try{ var v=document.getElementById('ver'); if(v) v.textContent='빌드 v23 포르사'; }catch(e){} }
 window.addEventListener('DOMContentLoaded',setVer); window.addEventListener('load',setVer);
 })();
