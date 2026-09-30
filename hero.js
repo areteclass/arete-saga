@@ -84,8 +84,23 @@ function outline(c,col){
 }
 
 /* ═══════════════ 꾸미기 데이터 ═══════════════ */
-var DEF_EYE={taro:'#8a5a2a',mir:'#4a7ad0',hana:'#2a9a6a',yuri:'#e05aa0',leon:'#8a5ad0'};
-var STYLES=[ ['taro','스파이크'],['mir','올백'],['hana','포니테일'],['yuri','긴 생머리'],['leon','샤기'],
+var DEF_EYE={taro:'#4a3228',mir:'#4a7ad0',hana:'#c83030',yuri:'#9a4ad0',leon:'#3a8ad8'};
+/* 직업별 기본 디자인 (그림 시안 기준) */
+var CLASS_LOOK={
+  taro:{outfit:'coat',   style:'hero',  pants:'#2a2a3a'},   // 아레테: 털 칼라 파란 코트
+  mir: {outfit:'knight', style:'short', pants:'#5a6478'},   // 포르사: 은빛 판금 기사
+  hana:{outfit:'rogue',  style:'hana',  pants:'#2a1e24'},   // 아길레: 붉은 스카프 무투가
+  yuri:{outfit:'witch',  style:'yuri',  pants:'#2a2050'},   // 리커버: 마녀 모자 · 보라 로브
+  leon:{outfit:'mystic', style:'messy', pants:'#2a2030'}    // 멘타: 흑백 로브 술사
+};
+if(typeof HERO!=='undefined'){
+  HERO.taro={skin:'#f4c896',hair:'#3a2a22',suit:'#2e5aa8',accent:'#f4f0ea',trim:'#6a4428'};
+  HERO.mir ={skin:'#f0c090',hair:'#aab6d6',suit:'#b8c0d0',accent:'#2e5aa8',trim:'#7a8498'};
+  HERO.hana={skin:'#f4c896',hair:'#d0302a',suit:'#2a2030',accent:'#d0302a',trim:'#6a4428'};
+  HERO.yuri={skin:'#f8d8c0',hair:'#d8d4e8',suit:'#4a3a9a',accent:'#f4f0ea',trim:'#e0b040'};
+  HERO.leon={skin:'#f0c8a0',hair:'#b8b0b0',suit:'#f0ece4',accent:'#2a2030',trim:'#e0b040'};
+}
+var STYLES=[ ['hero','용사'],['messy','부스스'],['taro','스파이크'],['mir','올백'],['hana','포니테일'],['yuri','긴 생머리'],['leon','샤기'],
   ['bob','단발'],['short','스포츠'],['bun','올림머리'],['twin','트윈테일','r1'],['wild','와일드','r3'],['wavy','웨이브','r5'] ];
 var EYES=[ ['bright','또렷한'],['sharp','날카로운'],['soft','순한'],['sleepy','나른한'] ];
 var EXPRS=[ ['confident','자신만만'],['smile','미소'],['battle','전투','r4'] ];
@@ -158,6 +173,10 @@ function hairFront(S,g,style,hair,accent,trim,U,sw){
   if(style==='taro'){
     H(multi(cap,poly(up([15,9,13,0,19,4,20,-4,24,2,27,-5,29,2,34,-1,33,6,38,5,33,10],U)),poly(up([16,9,32,9,31,13,28,10,26,12.5,23,9.5,21,12,18,10,16.5,13.5],U))));
     S(accent,multi(poly(up([15.5,8.2,32.5,8.2,32.5,10.3,15.5,10.3],U)),poly(up([16,8.5,8,10+sw*0.6,4,13+sw,15,11],U))));
+  } else if(style==='hero'){
+    H(multi(cap,poly(up([15,9,13.5,1,18,4,19.5,-3,23,2,26,-4,28.5,2,33,0,33,6,36,6,33,10],U)),poly(up([16,9,32,9,31.5,13,28.5,10,26.5,12.5,24,9.5,21.5,12,19,10,16.5,13],U))));
+  } else if(style==='messy'){
+    H(multi(cap,poly(up([15,8,14,1,18,3,20,-3,24,1,27,-3,30,1,34,1,33,7],U)),poly(up([16,9,32,8,33,14,30,11.5,27.5,13,25,10,22,12.5,19.5,10,16.5,14],U))));
   } else if(style==='mir'){
     H(multi(cap,poly(up([30,3,41,-1,35,6,42,8,34,11],U)),poly(up([16,5,21,-5,23,1,28,-6,29,2,34,-2,31,6],U)),poly(up([17,9,31,6.5,30,10,24,8,18,11],U))));
   } else if(style==='hana'){
@@ -208,14 +227,17 @@ function buildShow(id,eq,f){
   if(++cacheN>160){ cache={}; cacheN=0; }
   var base=(typeof HERO!=='undefined'&&HERO[id])||HERO.taro;
   var hair=hexOf(cu.hair||base.hair), skin=hexOf(cu.skin||base.skin), eye=hexOf(cu.eye||DEF_EYE[id]||'#4a7ad0');
-  var style=cu.style||id, eyeT=EYE_MAP[cu.eyeType]?cu.eyeType:'bright', expr=MOUTH_MAP[cu.expr]?cu.expr:'confident';
+  var CL=CLASS_LOOK[id]||CLASS_LOOK.taro;
+  var style=cu.style||CL.style, eyeT=EYE_MAP[cu.eyeType]?cu.eyeType:'bright', expr=MOUTH_MAP[cu.expr]?cu.expr:'confident';
   var P=POSE[cu.pose]||POSE.raise;
-  var suit=base.suit, trim=base.trim, accent=hexOf(base.accent), robe=0, heavy=0;
-  if(eq.dye){ suit=eq.dye; trim=sh(eq.dye,0.6); }
-  else if(eq.a&&typeof AART!=='undefined'&&AART[eq.a.id]){ suit=AART[eq.a.id][0]; trim=AART[eq.a.id][1]; robe=AART[eq.a.id][2]; heavy=robe?0:1; }
+  var outfit=CL.outfit, suit=base.suit, trim=base.trim, accent=hexOf(base.accent), robe=0, heavy=0;
+  if(eq.a&&typeof AART!=='undefined'&&AART[eq.a.id]){ suit=AART[eq.a.id][0]; trim=AART[eq.a.id][1]; robe=AART[eq.a.id][2]; heavy=robe?0:1; outfit='armor'; }
+  else { if(outfit==='knight') heavy=1; if(outfit==='witch'||outfit==='mystic') robe=1; }
+  if(eq.dye) suit=eq.dye;
   if(cu.top) suit=cu.top;
   suit=hexOf(suit); trim=hexOf(trim);
-  var pants=hexOf(cu.bottom||'#3a3458'), boot=heavy?sh(trim,0.8):'#6a4428';
+  var pants=hexOf(cu.bottom||CL.pants||'#3a3458'), boot=heavy?sh(trim,0.8):(outfit==='witch'?'#2a2050':'#4a3024');
+  var armU=(outfit==='rogue')?skin:suit;
   RIM=sh(hexOf((STORY.charColor&&STORY.charColor[id])||'#ffe9a8'),1.25);
   var U=(f>=2)?1:0, sw=[0,1,2,1][f]; HAIRU=U;
   var c=mk(RW,RH), g=c.getContext('2d');
@@ -247,21 +269,39 @@ function buildShow(id,eq,f){
     S(boot,multi(poly([14,68,22.5,68,22.5,76,12,76,12,73]),poly([25.5,68,34,68,36,73,36,76,25.5,76])));
   }
   if(robe) S(suit,poly(up([17,43,31,43,38,74,31,76,24,73,17,76,9,74],U)));
+  if(outfit==='coat') S(suit,multi(poly(up([16.5,43,23,45,20.5,63,12.5,61],U)),poly(up([25,45,31.5,43,35.5,61,27.5,63],U))));
+  if(outfit==='mystic') S('#7ab8e8',multi(poly(up([10,58,14,58,13,74,9,74],U)),poly(up([34,58,38,58,39,74,35,74],U))));
   /* 4) 몸통 + 옷 주름 */
   S(suit,poly(up([14.5,26,33.5,26,31,36,29,45,30,51,18,51,19,45,17,36],U)));
   if(heavy){
     S(sh(suit,1.15),poly(up([18,28,30,28,29,40,24,43,19,40],U)));
     hp(g,RX(20),RY(29.5+U),'#ffffff',3,1); hp(g,RX(19.5),RY(30.5+U),'#ffffff',1,3);
+  } else if(!robe&&outfit==='coat'){
+    S('#20263a',poly(up([21,27,27,27,26.5,50,21.5,50],U)));
+    S(trim,multi(poly(up([16,28,18,27,30,42,28,43],U)),poly(mir(up([16,28,18,27,30,42,28,43],U)))));
+    S('#d8dce8',ell(24,33.5+U,2,2.2)); hp(g,RX(23.3),RY(32.6+U),'#ffffff',2,2);
+  } else if(!robe&&outfit==='rogue'){
+    S(skin,poly(up([17.5,34,30.5,34,29.5,44,18.5,44],U)),'soft');
+    hp(g,RX(23.5),RY(39+U),sh(skin,0.8),2,1);
   } else if(!robe){
     S(sh(suit,0.82),poly(up([20,33,28,33,27,50,21,50],U)));
     S(accent,poly(up([20,26,28,26,24,33],U)));
     S(trim,poly(up([17,27,19,26,31,43,29,44],U)));
     hp(g,RX(18),RY(38+U),sh(suit,0.72),1,5); hp(g,RX(29.5),RY(37+U),sh(suit,0.72),1,4);
+  } else if(outfit==='witch'){
+    S(accent,poly(up([21,30,27,30,30,72,18,72],U)));
+    S(trim,multi(poly(up([9,72,39,72,38.5,74.5,9.5,74.5],U)),poly(up([22.5,54,25.5,54,24,57],U))));
+  } else if(outfit==='mystic'){
+    S(accent,poly(up([21,27,27,27,28.5,74,19.5,74],U)));
+    S(trim,multi(poly(up([20.5,28,21.5,28,20.5,74,19.5,74],U)),poly(up([26.5,28,27.5,28,28.5,74,27.5,74],U)),poly(up([9,72.5,39,72.5,38.5,74.5,9.5,74.5],U))));
+    S('#7ad0f0',poly(up([24,30,26,32.5,24,35,22,32.5],U)));
   }
   S(trim,poly(up([18,44,30,44,30,47,18,47],U)));
+  if(heavy&&outfit==='knight') S(accent,poly(up([20.5,47,27.5,47,27,58,24,60,21,58],U)));
+  if(outfit==='rogue') S(accent,poly(up([18,46,30,46,33.5,58,28,56,24,59,20,56,14.5,58],U)));
   hp(g,RX(23),RY(44+U),'#ffe070',4,6); hp(g,RX(23.5),RY(44.5+U),'#fff6c0',1,2);
   /* 5) 왼팔 */
-  S(suit,poly(up(P.lu,U)));
+  S(armU,poly(up(P.lu,U)),outfit==='rogue'?'soft':undefined);
   S(robe?suit:(heavy?trim:suit),poly(up(P.lf,U)));
   S(skin,ell(P.lh[0],P.lh[1]+U,2.6,2.6),'soft');
   /* 6) 무기 */
@@ -294,13 +334,16 @@ function buildShow(id,eq,f){
     }
   }
   /* 7) 오른팔 */
-  S(suit,poly(up(P.ru,U)));
+  S(armU,poly(up(P.ru,U)),outfit==='rogue'?'soft':undefined);
   S(robe?suit:(heavy?trim:suit),poly(up(P.rf,U)));
   S(skin,ell(HX,HY+0.5,2.8,2.7),'soft');
   if(heavy){ S(trim,multi(ell(14.5,27.5+U,4.8,3.4),ell(33.5,27.5+U,4.8,3.4))); hp(g,RX(12.5),RY(25.5+U),'#ffffff',3,1); hp(g,RX(31.5),RY(25.5+U),'#ffffff',3,1); }
   /* 8) 목 · 얼굴 */
   S(skin,poly(up([21,19,27,19,27,27,21,27],U)),'soft');
   hp(g,RX(21),RY(20.5+U),sh(skin,0.82),12,2);
+  if(outfit==='coat') S('#f4f0ea',multi(ell(18,26.5+U,4.2,2.6),ell(30,26.5+U,4.2,2.6),ell(24,25.8+U,3.6,1.8)));
+  if(outfit==='rogue') S(accent,multi(ell(24,25.8+U,5.4,2.4),poly(up([19,26,11,29+sw,6,33+sw,9,34+sw,18,28.5],U))));
+  if(outfit==='mystic') S(accent,poly(up([15,24.5,33,24.5,31,29.5,24,27.5,17,29.5],U)));
   S(skin,multi(ell(24,13+U,7.4,8.4),ell(16.6,14+U,1.3,2),ell(31.4,14+U,1.3,2),poly(up([19,18,29,18,24,22.5],U))),'soft');
   /* 9) 앞머리 */
   hairFront(S,g,style,hair,accent,trim,U,sw);
@@ -331,6 +374,13 @@ function buildShow(id,eq,f){
     else { S(X,multi(ell(24,6+U,12.5,2.5),poly(up([17.5,6,30.5,6,29.5,-1,18.5,-1],U)))); S(Y,poly(up([17.6,3.5,30.4,3.5,30.3,5.5,17.7,5.5],U))); }
   }
   if(ht) drawHat(ht[0],ht[1]);
+  else if(outfit==='witch'&&!cu.nohat){ drawHat('wizard',{X:suit,Y:trim}); px(g,33.5,-8+U,trim,1,2); px(g,33,-6+U,trim,2,1); }
+  c._orb=null;
+  if(outfit==='mystic'&&!eq.w){
+    var ox0=P.lh[0]-4, oy0=P.lh[1]-7+U;
+    S('#3a8ae8',ell(ox0,oy0,3.2,3.2),'soft'); hp(g,RX(ox0-1.5),RY(oy0-1.5),'#ffffff',2,2);
+    c._orb=[ox0,oy0];
+  }
   /* 12) 장신구 */
   if(eq.acc){
     var ai=eq.acc.id, it=G.itemById&&G.itemById[ai], tc=hexOf((it&&typeof tierColor==='function')?tierColor(it):'#ffe070');
@@ -359,6 +409,12 @@ function drawShowcase(g,id,eq,cx,groundY,k){
   }
   var sm=g.imageSmoothingEnabled; g.imageSmoothingEnabled=false;
   g.drawImage(spr,x0,y0,RW*k,RH*k); g.imageSmoothingEnabled=sm;
+  if(spr._orb){
+    var ob=spr._orb, gx0=x0+(OX+ob[0])*u, gy0=y0+(OY+ob[1])*u+Math.sin(t/400)*u, rr=9*u;
+    g.save(); g.globalCompositeOperation='lighter';
+    var og=g.createRadialGradient(gx0,gy0,0,gx0,gy0,rr); og.addColorStop(0,'#8fd0ff'); og.addColorStop(1,'rgba(0,0,0,0)');
+    g.globalAlpha=0.45+0.15*Math.sin(t/250); g.fillStyle=og; g.fillRect(gx0-rr,gy0-rr,rr*2,rr*2); g.restore();
+  }
   var w=eq.w&&G.itemById?G.itemById[eq.w.id]:null, lv=(eq.w&&eq.w.lvl)||0;
   if(spr._blade){
     var b=spr._blade, bc=hexOf(b[4]), strong=(lv>=3||(w&&(Number(w.tier)>=3||Number(w.price)<=0)));
@@ -450,7 +506,10 @@ function renderCustomUI(){
     var lockedOnes=list.filter(function(o){ return o[2]&&!unlocked(o[2]); });
     if(lockedOnes.length) h+='<div style="width:100%;font-size:10px;color:var(--muted)">🔒 '+lockedOnes.map(function(o){ return o[1]+'('+REG_NAME[o[2]]+' 보스 처치)'; }).join(' · ')+'</div>';
   }
-  if(_cuTab==='style') listOpts('style',STYLES,id);
+  if(_cuTab==='style'){
+    listOpts('style',STYLES,(CLASS_LOOK[id]||{}).style||id);
+    if((CLASS_LOOK[id]||{}).outfit==='witch') h+='<div style="width:100%"></div>'+btn(!!cu.nohat,false,'var(--panel2)',"setHeroCust('nohat',"+(cu.nohat?"''":"'yes'")+")",cu.nohat?'🎩 마녀 모자 쓰기':'🎩 마녀 모자 벗기');
+  }
   else if(_cuTab==='eyeType') listOpts('eyeType',EYES,'bright');
   else if(_cuTab==='expr') listOpts('expr',EXPRS,'confident');
   else if(_cuTab==='pose') listOpts('pose',POSES,'raise');
@@ -493,6 +552,13 @@ syncFromSave=function(){
 };
 
 /* ═══════════════ 캐릭터 선택 화면 ═══════════════ */
+/* chars/<id>.png 가 있으면 선택 화면에 일러스트를, 없으면 도트 쇼케이스를 보여준다 */
+var ARTS={};
+['taro','mir','hana','yuri','leon'].forEach(function(id){
+  var im=new Image(), rec={img:im,ok:false}; ARTS[id]=rec;
+  im.onload=function(){ rec.ok=true; }; im.onerror=function(){ rec.ok=false; };
+  im.src='chars/'+id+'.png?v=22';
+});
 drawSelBig=function(id){
   var c=document.getElementById('sel-big'); if(!c) return;
   c.width=190; c.height=250;
@@ -503,12 +569,15 @@ drawSelBig=function(id){
   var g=c.getContext('2d'), col=hexOf((STORY.charColor&&STORY.charColor[id])||'#9b7be0');
   (function anim(){
     if(!document.getElementById('sel-big')){ _selT=null; return; }
-    var fy=drawStage(g,c.width,c.height,col,now());
-    drawShowcase(g,id,{},c.width/2,fy+3,1);
+    var t=now(), fy=drawStage(g,c.width,c.height,col,t), art=ARTS[id];
+    if(art&&art.ok){
+      var hh=c.height-34, ww=art.img.width*hh/art.img.height, bob=Math.sin(t/600)*2;
+      g.save(); g.imageSmoothingEnabled=true; g.drawImage(art.img,c.width/2-ww/2,fy+6-hh+bob,ww,hh); g.restore();
+    } else drawShowcase(g,id,{},c.width/2,fy+3,1);
     _selT=requestAnimationFrame(anim);
   })();
 };
 
-function setVer(){ try{ var v=document.getElementById('ver'); if(v) v.textContent='빌드 v21 코디'; }catch(e){} }
+function setVer(){ try{ var v=document.getElementById('ver'); if(v) v.textContent='빌드 v22 새 디자인'; }catch(e){} }
 window.addEventListener('DOMContentLoaded',setVer); window.addEventListener('load',setVer);
 })();
