@@ -558,8 +558,10 @@ syncFromSave=function(){
 var ARTS={};
 ['taro','mir','hana','yuri','leon'].forEach(function(id){
   var im=new Image(), rec={img:im,ok:false}; ARTS[id]=rec;
-  im.onload=function(){ rec.ok=true; }; im.onerror=function(){ rec.ok=false; };
-  im.src='chars/'+id+'.png?v=22';
+  im.onload=function(){ rec.ok=true; };
+  var tries=['chars/'+id+'.png?v=24', id+'.png?v=24'], ti=0;     // chars 폴더 → 없으면 저장소 첫 화면(루트)
+  im.onerror=function(){ ti++; if(ti<tries.length) im.src=tries[ti]; else rec.ok=false; };
+  im.src=tries[0];
 });
 drawSelBig=function(id){
   var c=document.getElementById('sel-big'); if(!c) return;
@@ -580,6 +582,6 @@ drawSelBig=function(id){
   })();
 };
 
-function setVer(){ try{ var v=document.getElementById('ver'); if(v) v.textContent='빌드 v23 포르사'; }catch(e){} }
+function setVer(){ try{ var v=document.getElementById('ver'); if(v) v.textContent='빌드 v24 선택화면'; }catch(e){} }
 window.addEventListener('DOMContentLoaded',setVer); window.addEventListener('load',setVer);
 })();
