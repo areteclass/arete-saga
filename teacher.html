@@ -361,6 +361,139 @@ function fillSettings(s){
   _evtOn=!!s.eventOn; $('evtSwitch').classList.toggle('on',_evtOn);
   $('anTitle').value=s.announceTitle||''; $('anBody').value=s.announceBody||'';
   $('cGoal').value=s.coopGoal||200; $('cReward').value=s.coopReward||50; $('cLabel').value=s.coopLabel||'';
+  <!-- ═══ teacher.html 추가분 (v19) : 계정 삭제 · 상자 제한 설정 ═══
+     teacher.html 맨 아래 </body> 바로 위에 이 블록 전체를 붙여넣으세요. -->
+<script>
+(function(){
+  /* 1) 학생 카드에 🗑 계정 삭제 버튼 추가 */
+  renderTable=function(){
+    var j=window._data, el=$('stuList'); if(!el) return;
+    if(!j||!j.rows){ el.innerHTML='<div style="color:#ff8a8a;font-size:11.5px">데이터가 없습니다. [새로고침]을 눌러주세요.</div>'; return; }
+    var f=$('clsFilter').value;
+    var rows=j.rows.filter(function(r){return !f||r.cls===f;});
+    rows.sort(function(a,b){return (b.power||0)-(a.power||0);});
+    if(!rows.length){ el.innerHTML='<div style="color:#ffca4b;font-size:11.5px">'+(j.rows.length?('선택한 반("'+f+'")에 학생이 없어요.'):'아직 가입한 학생이 없습니다.')+'</div>'; return; }
+    var html='';
+    rows.forEach(function(r){
+      var nm=String(r.name||'(이름없음)').replace(/</g,'').replace(/'/g,''), hk=String(r.hakbun||'').replace(/'/g,'');
+      html+='<div style="background:#1f1830;border:2.5px solid #120c1e;border-radius:9px;padding:10px 12px;margin-bottom:8px">'+
+        '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">'+
+          '<div style="color:#efeaf7;font-size:13px"><b>'+nm+'</b> <span style="color:#a99cc4;font-size:11px">'+(r.cls||'반없음')+' · '+hk+'</span></div>'+
+          '<div class="row" style="gap:6px">'+
+            '<button class="sm ghost" onclick="doResetPw(\''+hk+'\',\''+nm+'\')">🔑 비번 초기화</button>'+
+            '<button class="sm danger" onclick="doDeleteAcc(\''+hk+'\',\''+nm+'\')">🗑 삭제</button>'+
+          '</div></div>'+
+        '<div style="margin-top:7px;color:#efeaf7;font-size:11.5px">Lv <b style="color:#ffca4b">'+(r.level!=null?r.level:'-')+'</b>'+
+          ' · 전투력 <b style="color:#ffca4b">'+(r.power||0)+'</b> · 코어 <b>'+(r.cleared||0)+'/5</b>'+
+          ' · 정답 <b style="color:#66e08a">'+(r.solved||0)+'</b> · 오늘 <b style="color:#37e0cf">'+(r.todaySolve||0)+'</b></div>'+
+        (r.last?'<div style="margin-top:4px;color:#7a6a94;font-size:10px">최근 접속 '+String(r.last).slice(0,24)+'</div>':'')+
+      '</div>';
+    });
+    el.innerHTML=html;
+  };
+  window.doDeleteAcc=function(hakbun,name){
+    if(!confirm(name+'('+hakbun+') 계정을 삭제할까요?\n레벨·아이템·기록이 모두 사라지며 되돌릴 수 없습니다.')) return;
+    var typed=prompt('정말 삭제하려면 학번 "'+hakbun+'" 을(를) 그대로 입력하세요.');
+    if(String(typed||'').trim()!==String(hakbun)){ alert('학번이 일치하지 않아 취소했습니다.'); return; }
+    post('adminDeleteAccount',[KEY,hakbun]).then(function(j){
+      alert((j&&j.msg)||(j&&j.ok?'삭제 완료':'실패'));
+      if(j&&j.ok) loadDash();
+    });
+  };
+
+  /* 2) 이벤트 탭에 보물상자 제한 설정 카드 */
+  var pane=document.getElementById('pane-event');
+  if(pane){
+    var card=document.createElement('div'); card.className='card';
+    card.innerHTML='<h2>📦 보물상자 제한</h2>'+
+      '<label>같은 상자를 다시 열 수 있는 간격 (분)</label><input id="chCd" type="number" min="0">'+
+      '<label>하루 최대 개수 (0 = 제한 없음)</label><input id="chMax" type="number" min="0">'+
+      '<button style="width:100%;margin-top:10px" onclick="saveChest()">저장</button>'+
+      '<div id="chMsg" class="msg"></div>'+
+      '<div class="muted">기본값은 60분 · 제한 없음입니다. 섬마다 상자 3개, 모두 15개가 있어요.</div>';
+    pane.appendChild(card);
+  }
+  window.saveChest=function(){
+    var patch={chestCooldownMin:Number($('chCd').value)||0, chestDailyMax:Number($('chMax').value)||0};
+    post('adminSaveSettings',[KEY,patch]).then(function(j){
+      $('chMsg').textContent=j&&j.ok?'저장했습니다. (학생은 다음 로그인부터 적용)':'실패';
+      $('chMsg').style.color=j&&j.ok?'#66e08a':'#ff6b6b';
+    });
+  };
+  var _fill=fillSettings;
+  fillSettings=function(s){
+    _fill(s);
+    if($('chCd')) $('chCd').value=(s.chestCooldownMin!=null?s.chestCooldownMin:60);
+    if($('chMax')) $('chMax').value=(s.chestDailyMax!=null?s.chestDailyMax:0);
+  };
+})();
+</script>
+
+<!-- ═══ v30 보안 추가분 (위 블록 바로 아래에 이어서 붙여넣기) ═══ -->
+<script>
+(function(){
+  /* 1) 관리자 키를 기기에 영구 저장하지 않음: 이 탭을 닫으면 사라짐 (공용 컴퓨터 대비) */
+  try{
+    var old=localStorage.getItem('t_key');
+    if(old){ sessionStorage.setItem('t_key',old); localStorage.removeItem('t_key'); }
+    var sk=sessionStorage.getItem('t_key');
+    if(sk&&!window._autoTried){ window._autoTried=1; KEY=sk; $('key').value=sk; tryEnter(); }
+  }catch(e){}
+  var _unlock=unlock;
+  unlock=function(){
+    _unlock();
+    setTimeout(function(){ try{ var k=localStorage.getItem('t_key'); if(k){ sessionStorage.setItem('t_key',k); localStorage.removeItem('t_key'); } }catch(e){} },1500);
+  };
+  var _logout=logout;
+  logout=function(){ try{ sessionStorage.removeItem('t_key'); localStorage.removeItem('t_key'); }catch(e){} _logout(); };
+
+  /* 2) 비밀번호 초기화: 이제 임시 비밀번호를 발급해 알려 준다 */
+  window.doResetPw=function(hakbun,name){
+    if(!confirm(name+'('+hakbun+') 학생의 비밀번호를 초기화할까요?\n임시 비밀번호가 발급되고, 학생은 첫 로그인 때 새 비밀번호를 정하게 됩니다.')) return;
+    post('adminResetPassword',[KEY,hakbun]).then(function(j){ alert((j&&j.msg)||(j&&j.ok?'초기화 완료':'실패')); });
+  };
+
+  /* 3) 약한 관리자 키 경고 */
+  var _fill2=fillSettings;
+  fillSettings=function(s){
+    _fill2(s);
+    var b=document.getElementById('weakKeyBanner');
+    if(s.weakAdminKey&&!b){
+      b=document.createElement('div'); b.id='weakKeyBanner';
+      b.style.cssText='background:#5a1e1e;border:3px solid #e05a5a;color:#ffd0d0;font-size:11.5px;line-height:1.7;padding:10px 12px;border-radius:9px;margin-bottom:12px';
+      b.innerHTML='⚠ <b>관리자 키가 약합니다.</b> 학생이 추측하거나 예전에 노출된 적이 있을 수 있어요.<br>구글 시트의 [확장 프로그램 → Apps Script]에서 <b>rotateAdminKey</b> 함수를 실행하면 새로운 강한 키가 만들어집니다.';
+      document.querySelector('.wrap').insertBefore(b,document.querySelector('.wrap').firstChild);
+    }
+    if(s.legacyHtml&&!document.getElementById('legacyBanner')){
+      var l=document.createElement('div'); l.id='legacyBanner';
+      l.style.cssText='background:#4a3a10;border:3px solid #e0a05a;color:#ffe9b0;font-size:11.5px;padding:9px 12px;border-radius:9px;margin-bottom:12px';
+      l.innerHTML='⚠ 설정 시트에 <b>legacyHtml = 1</b>이 켜져 있어요. 이 상태에서는 학생이 다른 학생 계정을 조작할 수 있는 통로가 열려 있습니다. 0으로 바꿔 주세요.';
+      document.querySelector('.wrap').insertBefore(l,document.querySelector('.wrap').firstChild);
+    }
+  };
+
+  /* 4) 보안 기록 카드 (이벤트 탭) */
+  var pane=document.getElementById('pane-event');
+  if(pane){
+    var card=document.createElement('div'); card.className='card';
+    card.innerHTML='<h2>🔐 보안 기록</h2><div class="muted">로그인 반복 실패, 관리자 키 오류, 비정상 요청 등이 기록돼요. 같은 학번이 반복해서 보이면 확인해 보세요.</div>'+
+      '<button class="sm ghost" style="margin-top:8px" onclick="loadSecLog()">🔄 불러오기</button><div id="secLog" style="margin-top:8px"></div>';
+    pane.appendChild(card);
+  }
+  window.loadSecLog=function(){
+    var el=document.getElementById('secLog'); el.innerHTML='<div class="muted">불러오는 중…</div>';
+    post('adminSecurityLog',[KEY]).then(function(j){
+      if(!j||!j.ok){ el.innerHTML='<div class="msg" style="color:#ff6b6b">'+((j&&j.msg)||'불러오지 못했어요.')+'</div>'; return; }
+      function rows(list,empty){ if(!list.length) return '<div class="muted">'+empty+'</div>';
+        return list.map(function(x){ var a=String(x.a).replace(/</g,''), b=String(x.b).replace(/</g,'');
+          return '<div style="background:#1f1830;border:2px solid #120c1e;border-radius:7px;padding:6px 9px;margin-bottom:5px;font-size:11px"><span style="color:#7a6a94">'+x.t+'</span> · <b style="color:#ffca4b">'+a+'</b><br><span style="color:#a99cc4">'+b+'</span></div>'; }).join(''); }
+      el.innerHTML=(j.locked?'<div class="msg" style="color:#ffca4b">⚠ 관리자 키 입력이 잠금 상태예요.</div>':'')+
+        '<div style="font-size:11px;color:#ffca4b;margin:6px 0 4px">이상 징후</div>'+rows(j.security,'기록된 이상 징후가 없어요. 👍')+
+        '<div style="font-size:11px;color:#ffca4b;margin:10px 0 4px">관리자 작업</div>'+rows(j.admin,'기록이 없어요.');
+    });
+  };
+})();
+</script>
 }
 </script>
 </body></html>
