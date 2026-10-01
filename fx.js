@@ -8,6 +8,8 @@
    ④ 필살기 5종 (화면 어두워짐 + 이름 배너 + 전용 연출)
       유성우 · 강철 가시 · 난무 참격 · 성스러운 파동 · 번개 폭풍
    ⑤ 스킬 버튼에 쿨타임 게이지
+   ⑥ 몹 밸런스 (v28): 체력은 '지역 기준 장비'와 '내 공격력'을 함께 보고 계산 → 한 방 사망 방지,
+      몹 공격은 내 최대 HP 비율, 필살기 게이지 충전 속도 조정, 스킬 피해 상향, 자동 스킬은 의미 있을 때만 사용
    필요: art.js v27 (무기 분리 지원). 설치: hero.js 다음 줄에 <script src="fx.js?v=27"></script>
    ═══════════════════════════════════════════════════════════════ */
 (function(){
@@ -154,11 +156,60 @@ function boltFx(x1,y1,x2,y2,dur,col,width,disp,onEnd){
 }
 function screenFlash(col,a,dur){ if(window.OPT&&OPT.reduceFx) return; fxAdd({L:2,dur:dur||0.18,drw:function(g){ var p=this.t/this.dur; g.globalAlpha=a*(1-p); g.fillStyle=col; g.fillRect(0,0,W,H); }}); }
 
-/* ───────────── 피해 처리 (원래 공식 그대로) ───────────── */
-function hitMob(e,mul,col,big){
+/* ═══════════════ 몹 밸런스 ═══════════════
+   목표: 일반 몹 약 5타 · 정예 약 12타 · 희귀 약 26타 (지역 기준 장비·숙련도 가정)
+         공격력이 지역 수준을 넘어도 최소 3타 · 7타 · 14타는 필요 (한 방 사망 방지)
+         공격력이 높을수록, 퀴즈로 숙련도를 올릴수록 더 적은 타수로 잡힘 → 성장의 의미 유지 */
+var HIT_AVG=1.4;                      // 콤보(0.9·1.05·1.9)와 치명타를 평균 낸 타격 배수
+var HP_MULT=[5,12,26];                // 지역 기준 평균 타격 N번 분량 (일반·정예·희귀)
+var HP_FLOOR=[3,7,15];            // 아무리 강해져도 최소로 필요한 타수
+var SP_FACTOR=[1,1.12,0.92];          // 개체 종류별 체력 차이 (0:기본, 1:단단함, 2:날렵함)
+var DMG_PCT=[0.06,0.10,0.17];         // 몹 한 방이 최대 HP에서 차지하는 비율 (지역이 깊을수록 +)
+var SK_BOOST=2.4, ULT_BOOST=5.0;      // 스킬·필살기 피해 배율 (쿨타임 4초 값어치)
+var GAUGE_SCALE=0.3;                  // 필살기 게이지 충전 속도 (원래의 30%)
+function regIdx(rid){ var rs=G.regions||[]; for(var i=0;i<rs.length;i++) if(rs[i].id===rid) return i; return 0; }
+function mastOf(z){ var r=G.regions&&G.regions[z]; return (r&&typeof masteryOf==='function')?masteryOf(r.id):0; }
+var BAL={};
+BAL.refAtk=function(z){                 // 그 지역까지 온 사람이 갖출 만한 공격력 (상점 최고 무기 기준)
+  var best=0;
+  (G.items||[]).forEach(function(it){
+    if(it.kind!=='무기'||it.effect!=='atk'||!(Number(it.price)>0)) return;
+    if((it.region?regIdx(it.region):0)<=z) best=Math.max(best,Number(it.value)||0);
+  });
+  return 10+z*2.5+best*1.3;
+};
+BAL.curHit=function(z){ var atk=(G.save&&G.save.atk)||6; return atk*HIT_AVG*(1+mastOf(z)); };
+BAL.refHit=function(z){ return BAL.refAtk(z)*HIT_AVG*1.5; };
+BAL.hp=function(e){
+  var t=Math.min(2,e.tier||0), z=e.z||0;
+  var ref=BAL.refHit(z), cur=BAL.curHit(z), over=Math.max(1,cur/ref);
+  var hp=Math.max(ref*HP_MULT[t]*Math.pow(over,0.45), cur*HP_FLOOR[t])*(SP_FACTOR[e.sp||0]||1);   // 기준 초과분은 체력도 일부 따라 오름
+  return Math.max(24,Math.round(hp));
+};
+BAL.dmg=function(e){
+  var t=Math.min(2,e.tier||0), z=e.z||0, mx=(G.save&&G.save.maxHP)||100, def=(G.save&&G.save.def)||0;
+  var pct=DMG_PCT[t]+z*0.008*(t?1.2:1), red=Math.min(0.45,def*0.012);
+  return Math.max(1,Math.round(mx*pct*(1-red)));
+};
+window.BAL=BAL;
+function ensureMobHp(e){ if(e&&e.hp===undefined){ e.maxhp=BAL.hp(e); e.hp=e.maxhp; } }
+function remainHp(e){ return e.hp===undefined?BAL.hp(e):e.hp; }
+/* 필살기 게이지: 모든 충전량에 GAUGE_SCALE을 곱한다 (감소·초기화는 그대로) */
+(function(){
+  var g=Number(player.gauge)||0;
+  Object.defineProperty(player,'gauge',{configurable:true,enumerable:true,
+    get:function(){ return g; },
+    set:function(v){ v=Number(v)||0;
+      if(v>g){ var gain=(v-g)*GAUGE_SCALE; if(v>=100) gain=Math.max(gain,1.2); g=g+gain; if(g>=99.5) g=100; }   // 100에 못 닿고 멈추지 않게
+      else g=v;
+      g=Math.max(0,Math.min(100,g)); }});
+})();
+
+/* ───────────── 피해 처리 ───────────── */
+function hitMob(e,mul,col,big,boost){
   if(!e||e.dead||(e.hp!==undefined&&e.hp<=0)) return false;
-  if(e.hp===undefined){ e.maxhp=Math.round((18+e.z*14)*(e.tier===2?3.2:e.tier===1?1.8:1)); e.hp=e.maxhp; }
-  var atk=(G.save&&G.save.atk)||6, dm=Math.max(1,Math.round(atk*mul)), now=performance.now();
+  ensureMobHp(e);
+  var atk=(G.save&&G.save.atk)||6, dm=Math.max(1,Math.round(atk*mul*(boost||SK_BOOST)*(1+mastOf(e.z||0)))), now=performance.now();
   e.hp-=dm; e.hitT=now; e.knockT=now; e.knockDX=e.tx-player.x; e.knockDY=e.ty-player.y;
   var kd=Math.hypot(e.knockDX,e.knockDY)||1; e.knockDX/=kd; e.knockDY/=kd;
   addFx(e.tx+0.5,e.ty-0.3,dm,col,big||mul>=1.8);
@@ -283,7 +334,11 @@ function hitSparks(e){
   if(step===3){ after(0.1,function(){ ring(p.x,p.y+10,64,col,0.35,6,0.5); for(var j=0;j<RED(8);j++) smokeP(p.x+rnd(-20,20),p.y+rnd(6,16),rnd(-70,70),rnd(-40,-10),rnd(0.4,0.8),rnd(9,15),'#8a7a66'); }); }
 }
 var _atk=attackHunt;
-attackHunt=function(e){ var b=lastAtk; _atk(e); if(lastAtk!==b) hitSparks(e); };
+attackHunt=function(e){
+  ensureMobHp(e);                                            // remaster.js가 구버전이어도 새 체력 공식 적용
+  entities.forEach(function(o){ if(o.type==='hunt'&&!o.dead&&o.hp===undefined&&Math.hypot(o.tx-e.tx,o.ty-e.ty)<3) ensureMobHp(o); });
+  var b=lastAtk; _atk(e); if(lastAtk!==b) hitSparks(e);
+};
 
 /* ═══════════════ ② 공격 스킬 5종 ═══════════════ */
 /* 🔥 화염구 (아레테) */
@@ -380,6 +435,16 @@ function skBolt(tg){
 }
 var SKFX={taro:skFire,mir:skEarth,hana:skWind,yuri:skHoly,leon:skBolt};
 
+function skillWorth(inR){
+  if(inR.length>=2) return true;
+  var e=inR[0]; if((e.tier||0)>=1) return true;
+  return remainHp(e)>=BAL.curHit(e.z||0)*3;
+}
+function ultWorth(tg){
+  if(tg.length>=3) return true;
+  for(var i=0;i<tg.length;i++){ var e=tg[i]; if((e.tier||0)>=1||remainHp(e)>=BAL.curHit(e.z||0)*4) return true; }
+  return false;
+}
 var _castBase=castAttackSkill;
 castAttackSkill=function(manual){
   if(!G.save) return;
@@ -391,6 +456,7 @@ castAttackSkill=function(manual){
   var inR=mobs.filter(function(e){ if(sk.type==='line'){ var dxr=(e.tx-player.x)*player.dir; return dxr>-0.6&&dxr<RANGE&&Math.abs(e.ty-player.y)<1.3; } return Math.hypot(e.tx-player.x,e.ty-player.y)<=RANGE; });
   if(!inR.length){ if(manual) toast('사거리 안에 몬스터가 없어요'); return; }
   inR.sort(function(a,b){ return Math.hypot(a.tx-player.x,a.ty-player.y)-Math.hypot(b.tx-player.x,b.ty-player.y); });
+  if(manual!==true&&!skillWorth(inR)) return;                // 자동 발동은 '쓸 만한 상황'에서만 (곧 죽을 몹에 낭비 방지)
   player.skillReady=now+SK_CD; player.gauge=Math.min(100,player.gauge+10); castT=now;
   var face=inR[0].tx<player.x?-1:1; if(sk.type!=='line') player.dir=face;
   fn(inR);
@@ -425,7 +491,7 @@ function ultMeteor(tg,R,mul){
         g.globalCompositeOperation='lighter'; for(i2=1;i2<=10;i2++){ var q=i2/10; glow(g,x-ux*q*120,y-uy*q*120,22*(1-q*0.6),'#ff6a1a',0.6*(1-q)); }
         glow(g,x,y,42,'#ff8a30',0.55); g.globalCompositeOperation='source-over';
         var gr=g.createRadialGradient(x,y,0,x,y,16); gr.addColorStop(0,'#ffffff'); gr.addColorStop(0.4,'#ffe070'); gr.addColorStop(1,'rgba(255,100,30,0)'); g.fillStyle=gr; g.beginPath(); g.arc(x,y,16,0,6.2832); g.fill(); },
-      end:function(){ explode(s.x,s.y,78,'#fff2a0','#ff7a1e',idx%2?4:7); if(s.e) hitMob(s.e,mul,'#ff9a3a',true); }}); }); });
+      end:function(){ explode(s.x,s.y,78,'#fff2a0','#ff7a1e',idx%2?4:7); if(s.e) hitMob(s.e,mul,'#ff9a3a',true,ULT_BOOST); }}); }); });
 }
 function ultSpikes(tg,R,mul){
   var h=hero(), cx=h.x, cy=h.y+TILE*0.44, i;
@@ -436,7 +502,7 @@ function ultSpikes(tg,R,mul){
       g.fillStyle=gr; g.beginPath(); g.moveTo(X-11,Y); g.lineTo(X,Y-ht); g.lineTo(X+11,Y); g.closePath(); g.fill(); g.strokeStyle='#20263a'; g.lineWidth=2; g.stroke();
       g.globalCompositeOperation='lighter'; g.strokeStyle='rgba(255,255,255,'+(0.7*fade)+')'; g.lineWidth=1.5; g.beginPath(); g.moveTo(X-4,Y-4); g.lineTo(X-0.5,Y-ht+5); g.stroke(); }});
       for(var z=0;z<RED(3);z++) rockP(sx,sy,rnd(-60,60),rnd(-300,-160),sy+8); }); })(i);
-  tg.forEach(function(e,idx){ after(0.6+Math.min(idx,8)*0.04,function(){ if(hitMob(e,mul,'#e8ecf4',true)){ var q=pos(e); for(var k=0;k<RED(10);k++) sparkP(q.x,q.y,rnd(-3.1,0),rnd(160,380),rnd(0.25,0.5),'#e8ecf4',500); } }); });
+  tg.forEach(function(e,idx){ after(0.6+Math.min(idx,8)*0.04,function(){ if(hitMob(e,mul,'#e8ecf4',true,ULT_BOOST)){ var q=pos(e); for(var k=0;k<RED(10);k++) sparkP(q.x,q.y,rnd(-3.1,0),rnd(160,380),rnd(0.25,0.5),'#e8ecf4',500); } }); });
 }
 function ultSlashes(tg,R,mul){
   var h=hero(), cs=[], i;
@@ -448,7 +514,7 @@ function ultSlashes(tg,R,mul){
       g.fillStyle='rgba(255,255,255,'+fade+')'; g.beginPath(); g.moveTo(x0,y0); g.lineTo((x0+x1)/2+nx*w*0.5,(y0+y1)/2+ny*w*0.5); g.lineTo(x1,y1); g.lineTo((x0+x1)/2-nx*w*0.5,(y0+y1)/2-ny*w*0.5); g.closePath(); g.fill();
       glow(g,X,Y,34*fade,'#37e0cf',0.45*fade); }}); if(i%3===0) shakeScreen(3); }); })(i);
   var acc=0; fxAdd({dur:1.1,upd:function(t,dt){ acc+=dt; if(acc>0.02&&t>0.25){ acc=0; var a=t*9, rr=rnd(40,80); glowP(h.x+Math.cos(a)*rr,h.y+Math.sin(a)*rr*0.5+14,Math.cos(a+1.57)*110,Math.sin(a+1.57)*55,0.4,rnd(4,7),'#c6fff6',0.8); } }});
-  [0.55,0.75,0.95].forEach(function(d){ after(d,function(){ tg.forEach(function(e){ if(hitMob(e,mul/3,'#37e0cf',true)){ var q=pos(e); for(var k=0;k<RED(7);k++) sparkP(q.x,q.y,rnd(0,6.28),rnd(160,360),rnd(0.2,0.4),'#ffffff',200); } }); shakeScreen(4); }); });
+  [0.55,0.75,0.95].forEach(function(d){ after(d,function(){ tg.forEach(function(e){ if(hitMob(e,mul/3,'#37e0cf',true,ULT_BOOST)){ var q=pos(e); for(var k=0;k<RED(7);k++) sparkP(q.x,q.y,rnd(0,6.28),rnd(160,360),rnd(0.2,0.4),'#ffffff',200); } }); shakeScreen(4); }); });
 }
 function ultNova(tg,R,mul){
   var h=hero(), cx=h.x, cy=h.y+TILE*0.44, i;
@@ -458,7 +524,7 @@ function ultNova(tg,R,mul){
     for(var z=0;z<RED(14);z++) glowP(cx+rnd(-40,40),cy+rnd(-6,6),rnd(-15,15),rnd(-200,-80),rnd(0.8,1.4),rnd(5,8),z%2?'#9af5b8':'#ffffff',0.9); });
   [0.5,0.66,0.82].forEach(function(d,idx){ after(d,function(){ ring(cx,cy,R*(1.35-idx*0.1),idx%2?'#ffffff':'#ffe070',0.55,10-idx*2,0.5); }); });
   tg.forEach(function(e){ var q=pos(e), d=Math.hypot(q.x-cx,(q.y-cy)*1.5); after(0.5+Math.min(0.55,d/(R*2.2)),function(){ pillar(q.x,q.y+12,'#ffe070',0.6,20);
-    after(0.1,function(){ if(hitMob(e,mul,'#ffe070',true)){ for(var k=0;k<RED(6);k++) featherP(q.x+rnd(-16,16),q.y-rnd(20,50),rnd(0.7,1.2)); } }); }); });
+    after(0.1,function(){ if(hitMob(e,mul,'#ffe070',true,ULT_BOOST)){ for(var k=0;k<RED(6);k++) featherP(q.x+rnd(-16,16),q.y-rnd(20,50),rnd(0.7,1.2)); } }); }); });
 }
 function ultStorm(tg,R,mul){
   var h=hero(), i, skyY=function(){ return cam.y-30; };
@@ -472,16 +538,18 @@ function ultStorm(tg,R,mul){
     shakeScreen(4); sfx2('bolt');
     for(var k=0;k<RED(12);k++) sparkP(s.p.x,s.p.y,rnd(-3.1,0),rnd(140,400),rnd(0.25,0.5),k%2?'#ffffff':'#c9aef5',500);
     ring(s.p.x,s.p.y+10,50,'#c9aef5',0.34,5,0.55); glowP(s.p.x,s.p.y,0,0,0.26,70,'#c9aef5',0.9);
-    if(s.e) hitMob(s.e,mul,'#c9aef5',true); }); });
+    if(s.e) hitMob(s.e,mul,'#c9aef5',true,ULT_BOOST); }); });
 }
 var ULT={taro:{f:ultMeteor,n:'지식 폭발',c:'#ffca4b',s:'메테오 스트라이크'},mir:{f:ultSpikes,n:'강철 강타',c:'#8fa3ff',s:'강철의 가시'},
          hana:{f:ultSlashes,n:'질풍 연격',c:'#37e0cf',s:'천 개의 참격'},yuri:{f:ultNova,n:'생명의 파동',c:'#ffe070',s:'성스러운 강림'},leon:{f:ultStorm,n:'정령 폭풍',c:'#c9aef5',s:'천둥의 심판'}};
 castActionSkill=function(){
-  if(casting||!G.save) return; casting=true; player.gauge=0;
+  if(casting||!G.save) return;
   var id=G.save['캐릭터'], u=ULT[id]||ULT.taro;
   var learned=Object.keys(G.save['스킬']||{}).length, hasUlt=!!(G.save['스킬']||{})[id.charAt(0)+'_ult'];
   var R=(3+learned*0.3+(hasUlt?2:0))*TILE, mul=(3+learned*0.5)*(hasUlt?1.6:1);
   var tg=entities.filter(function(e){ return !e.dead&&e.type==='hunt'&&regionReachable(Math.floor(e.tx/ZC))&&!(e.hp!==undefined&&e.hp<=0)&&Math.hypot(e.tx-player.x,e.ty-player.y)<=R/TILE; });
+  if(!ultWorth(tg)) return;                                 // 게이지는 가득 찬 채로 대기 → 정예·무리·막 시작한 몹 앞에서 발동
+  casting=true; player.gauge=0;
   hitStop(200); sfx2('ult'); castT=performance.now(); vib&&vib([40,60,40]);
   ultDim(1.7); ultBanner(u.n,u.c,u.s);
   u.f(tg,R,mul);
@@ -509,6 +577,6 @@ var _draw=draw;
 draw=function(){ _draw(); if(G.save&&running) drawFX(ctx); };
 
 window.FX={explode:explode,ring:ring,pillar:pillar,boltFx:boltFx,list:FXS,parts:PT,step:stepFX,draw:drawFX,skills:SKFX,ults:ULT};
-function setVer(){ try{ var v=document.getElementById('ver'); if(v) v.textContent='빌드 v27 전투 연출'; }catch(e){} }
+function setVer(){ try{ var v=document.getElementById('ver'); if(v) v.textContent='빌드 v28 밸런스'; }catch(e){} }
 window.addEventListener('DOMContentLoaded',setVer); window.addEventListener('load',setVer);
 })();
