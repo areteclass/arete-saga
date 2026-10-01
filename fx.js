@@ -200,7 +200,7 @@ function remainHp(e){ return e.hp===undefined?BAL.hp(e):e.hp; }
   Object.defineProperty(player,'gauge',{configurable:true,enumerable:true,
     get:function(){ return g; },
     set:function(v){ v=Number(v)||0;
-      if(v>g){ var gain=(v-g)*GAUGE_SCALE; if(v>=100) gain=Math.max(gain,1.2); g=g+gain; if(g>=99.5) g=100; }   // 100에 못 닿고 멈추지 않게
+      if(v>g){ var gain=(v-g)*GAUGE_SCALE*((window.FX&&FX.gaugeMul)||1); if(v>=100) gain=Math.max(gain,1.2); g=g+gain; if(g>=99.5) g=100; }   // 100에 못 닿고 멈추지 않게
       else g=v;
       g=Math.max(0,Math.min(100,g)); }});
 })();
@@ -542,13 +542,16 @@ function ultStorm(tg,R,mul){
 }
 var ULT={taro:{f:ultMeteor,n:'지식 폭발',c:'#ffca4b',s:'메테오 스트라이크'},mir:{f:ultSpikes,n:'강철 강타',c:'#8fa3ff',s:'강철의 가시'},
          hana:{f:ultSlashes,n:'질풍 연격',c:'#37e0cf',s:'천 개의 참격'},yuri:{f:ultNova,n:'생명의 파동',c:'#ffe070',s:'성스러운 강림'},leon:{f:ultStorm,n:'정령 폭풍',c:'#c9aef5',s:'천둥의 심판'}};
-castActionSkill=function(){
+var NEW_SKILL_ID_=/^(taro|mir|hana|yuri|leon)_[spu][0-9]$/;      // 스킬트리 2.0 id (예전 스킬 개수 계산에서 제외)
+castActionSkill=function(opts){
+  opts=opts||{};
   if(casting||!G.save) return;
   var id=G.save['캐릭터'], u=ULT[id]||ULT.taro;
-  var learned=Object.keys(G.save['스킬']||{}).length, hasUlt=!!(G.save['스킬']||{})[id.charAt(0)+'_ult'];
-  var R=(3+learned*0.3+(hasUlt?2:0))*TILE, mul=(3+learned*0.5)*(hasUlt?1.6:1);
+  var learned=Object.keys(G.save['스킬']||{}).filter(function(k){ return !NEW_SKILL_ID_.test(k); }).length, hasUlt=!!(G.save['스킬']||{})[id.charAt(0)+'_ult'];
+  var kk=opts.mulK||1;
+  var R=(3+learned*0.3+(hasUlt?2:0))*TILE*Math.sqrt(kk), mul=(3+learned*0.5)*(hasUlt?1.6:1)*kk;
   var tg=entities.filter(function(e){ return !e.dead&&e.type==='hunt'&&regionReachable(Math.floor(e.tx/ZC))&&!(e.hp!==undefined&&e.hp<=0)&&Math.hypot(e.tx-player.x,e.ty-player.y)<=R/TILE; });
-  if(!ultWorth(tg)) return;                                 // 게이지는 가득 찬 채로 대기 → 정예·무리·막 시작한 몹 앞에서 발동
+  if(!opts.force&&!ultWorth(tg)) return;                    // 자동 발동은 정예·무리·막 시작한 몹 앞에서만 (직접 누르면 항상 발동)
   casting=true; player.gauge=0;
   hitStop(200); sfx2('ult'); castT=performance.now(); vib&&vib([40,60,40]);
   ultDim(1.7); ultBanner(u.n,u.c,u.s);
@@ -576,7 +579,12 @@ update=function(dt){ _update(dt); stepFX(dt); hudCd(); };
 var _draw=draw;
 draw=function(){ _draw(); if(G.save&&running) drawFX(ctx); };
 
-window.FX={explode:explode,ring:ring,pillar:pillar,boltFx:boltFx,list:FXS,parts:PT,step:stepFX,draw:drawFX,skills:SKFX,ults:ULT};
-function setVer(){ try{ var v=document.getElementById('ver'); if(v) v.textContent='빌드 v28 밸런스'; }catch(e){} }
+window.FX={explode:explode,ring:ring,pillar:pillar,boltFx:boltFx,list:FXS,parts:PT,step:stepFX,draw:drawFX,skills:SKFX,ults:ULT,
+  /* v31: 스킬트리 2.0(skills.js)이 쓰는 도구들 */
+  v:31,gaugeMul:1,fxAdd:fxAdd,after:after,glow:glow,glowP:glowP,sparkP:sparkP,smokeP:smokeP,rockP:rockP,featherP:featherP,rgba:rgba,rnd:rnd,lerp:lerp,ease:ease,outC:outC,
+  pos:pos,hero:hero,muzzle:muzzle,hitMob:hitMob,magicCircle:magicCircle,screenFlash:screenFlash,sfx2:sfx2,RED:RED,quake:quake,ultBanner:ultBanner,ultDim:ultDim,
+  ensureMobHp:ensureMobHp,BAL:BAL,SK_BOOST:SK_BOOST,ULT_BOOST:ULT_BOOST,mastOf:mastOf,ultWorth:ultWorth,skillWorth:skillWorth,
+  markCast:function(){ castT=performance.now(); },fxUlt:castActionSkill};
+function setVer(){ try{ var v=document.getElementById('ver'); if(v) v.textContent='빌드 v31 스킬트리'; }catch(e){} }
 window.addEventListener('DOMContentLoaded',setVer); window.addEventListener('load',setVer);
 })();
