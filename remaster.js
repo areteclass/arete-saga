@@ -231,7 +231,7 @@ function showCombo(n,label){
   comboEl.classList.add('on'); clearTimeout(_comboHideT);
   _comboHideT=setTimeout(function(){ comboEl.classList.remove('on'); },900);
 }
-function ensureHp(e){ if(e.hp===undefined){ e.maxhp=Math.round((18+e.z*14)*(e.tier===2?3.2:e.tier===1?1.8:1)); e.hp=e.maxhp; } }
+function ensureHp(e){ if(e.hp===undefined){ e.maxhp=(window.BAL&&BAL.hp)?BAL.hp(e):Math.round((18+e.z*14)*(e.tier===2?3.2:e.tier===1?1.8:1)); e.hp=e.maxhp; } }   /* fx.js의 밸런스 공식이 있으면 그것을 사용 */
 function applyHit(e,dmg,crit,finisher,t){
   ensureHp(e); if(e.hp<=0) return;
   e.hp-=dmg; e.hitT=t;
@@ -334,7 +334,7 @@ function mobHitPlayer(e,t){
     }
     return;
   }
-  var mdmg=Math.max(1,Math.round(((Number(G.settings.mobDmgBase)||4)+e.z*3)*(e.tier===2?2:e.tier===1?1.4:1)-(G.save.def||0)*0.4));
+  var mdmg=(window.BAL&&BAL.dmg)?BAL.dmg(e):Math.max(1,Math.round(((Number(G.settings.mobDmgBase)||4)+e.z*3)*(e.tier===2?2:e.tier===1?1.4:1)-(G.save.def||0)*0.4));
   G.save.HP=Math.max(0,G.save.HP-mdmg);
   syncFromSave(); hurt(); shakeScreen(e.tier===2?7:3); vib(60); noise(0.08,0.05); hitStop(50);
   addFx(player.x,player.y-0.7,'-'+mdmg,'#ff6b6b');
