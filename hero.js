@@ -125,7 +125,7 @@ function compose(id,eq){
     var h=part(eq.hat.id), hid=eq.hat.id;
     if(h){
       if(hid==='cos_hat9') put(h,ox+fx-h.width/2,oy+a.top-h.height-2);
-      else if(hid==='cos_hat8') put(h,ox+fx-h.width*0.525,oy+fy-h.height*0.525-6,1.05);
+      else if(hid==='cos_hat8') put(h,ox+fx-h.width*1.4/2,oy+fy+7-36*1.4,1.4);          // 머리 크기에 맞춰 키우고 이어컵을 귀 높이로
       else if(hid==='cos_hat6') put(h,ox+fx-h.width/2,oy+a.top+6);
       else { var hs=BIGCROWN[hid]?0.75:1; put(h,ox+fx-h.width*hs/2,oy+a.top-h.height*hs*0.55,hs); }
     }
@@ -369,6 +369,6 @@ drawSelBig=function(id){
   })();
 };
 
-function setVer(){ try{ var v=document.getElementById('ver'); if(v) v.textContent='빌드 v26 조립식 캐릭터'; }catch(e){} }
+function setVer(){ try{ var v=document.getElementById('ver'); if(v) v.textContent='빌드 v28 밸런스'; }catch(e){} }
 window.addEventListener('DOMContentLoaded',setVer); window.addEventListener('load',setVer);
 })();
