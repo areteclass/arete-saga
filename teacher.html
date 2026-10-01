@@ -361,7 +361,9 @@ function fillSettings(s){
   _evtOn=!!s.eventOn; $('evtSwitch').classList.toggle('on',_evtOn);
   $('anTitle').value=s.announceTitle||''; $('anBody').value=s.announceBody||'';
   $('cGoal').value=s.coopGoal||200; $('cReward').value=s.coopReward||50; $('cLabel').value=s.coopLabel||'';
-  <!-- ═══ teacher.html 추가분 (v19) : 계정 삭제 · 상자 제한 설정 ═══
+}
+</script>
+<!-- ═══ teacher.html 추가분 (v19) : 계정 삭제 · 상자 제한 설정 ═══
      teacher.html 맨 아래 </body> 바로 위에 이 블록 전체를 붙여넣으세요. -->
 <script>
 (function(){
@@ -494,6 +496,5 @@ function fillSettings(s){
   };
 })();
 </script>
-}
-</script>
+
 </body></html>
