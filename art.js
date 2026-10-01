@@ -12,7 +12,7 @@ if(typeof drawGround!=='function'||typeof drawHero!=='function'){ console.warn('
 
 var ART={ curE:null, cache:{} };
 window.ART=ART;
-ART.v=27;
+ART.v=29;
 var OUTLINE='#140c1e';
 
 /* ───────────── 기본 도구 ───────────── */
@@ -400,16 +400,53 @@ var HAT_OF={
  cos_hat9:['halo',{Y:'#ffe98a'}], cos_hat4:['fox',{W:'#f4f0ea',R:'#c03a3a',x:'#2a2030'}],
  cos_owl:['owl',{X:'#8a6a3e',x:'#5a4228',Y:'#e0a030'}]
 };
-var CAPE={x:-1,y:11,r:["..CC............",".CCCc...........","cCCCc...........","cCCCc...........","cCCCCc..........","cCCCCc..........",".cCCCc..........","..ccc..........."]};
-var WING={x:-5,y:6,r:["......wW.","....wWWW.","..wWWWWW.",".wWWWWWw.","wWWWWww..","wWWww....",".ww......"]};
+/* 망토: 어깨에서 양옆으로 퍼지며 늘어지는 모양 (걷는 동안 아랫단이 출렁임) · 날개: 좌우로 펼친 깃털 날개 */
 var CAPE_COL={cos_cape1:'#c03a3a',cos_cape2:'#9b7be0',cos_cape3:'#e0b040',cos_cape4:'#2a2036',cos_cape5:'#ff6ad0',cos_cape8:'#5ad8c0'};
-var WING_COL={cos_cape6:['#f4f8ff','#b8c8e8'],cos_cape7:['#ff9a2e','#d8421e'],cos_cape9:['#fff0a8','#d8b048']};
+var WING_COL={cos_cape6:['#f4f8ff','#b8c8e8','#ffffff'],cos_cape7:['#ff9a2e','#d8421e','#ffe070'],cos_cape9:['#fff0a8','#d8b048','#ffffff']};
+var WING_L=[
+ "hW.......","hWW......","hWWw.....","WhWWw....","WhWWWw...","WWhWWWw..",".WhWWWWw.",".WWhWWWWw",
+ "..WWhWWWw","..wWWhWww","...wWWwww","....wwww.",".....ww.."];
+function mirRows(rows){ return rows.map(function(r){ return r.split('').reverse().join(''); }); }
+function hsl2hex(h,sv,l){ h=((h%360)+360)%360/360; var q=l<0.5?l*(1+sv):l+sv-l*sv, p2=2*l-q;
+  function f(t){ t=(t+1)%1; if(t<1/6) return p2+(q-p2)*6*t; if(t<1/2) return q; if(t<2/3) return p2+(q-p2)*(2/3-t)*6; return p2; }
+  function x(v){ var n=Math.round(v*255).toString(16); return n.length<2?'0'+n:n; }
+  return '#'+x(f(h+1/3))+x(f(h))+x(f(h-1/3)); }
+function lerpHex(a,b,t){ var A=parseInt(a.slice(1),16),B=parseInt(b.slice(1),16), r=[16,8,0].map(function(sh2){ var u=(A>>sh2)&255,v=(B>>sh2)&255; return Math.round(u+(v-u)*t); });
+  return '#'+r.map(function(n){ var h=n.toString(16); return h.length<2?'0'+h:h; }).join(''); }
+function capeRowColor(id,r,rows,custom){
+  if(custom) return custom;
+  if(id==='cos_cape5') return hsl2hex((performance.now()/9+r*26)%360,0.85,0.62);          // 무지개: 색이 흐름
+  if(id==='cos_cape8') return lerpHex('#5ad8c0','#9b7be0',r/Math.max(1,rows-1));          // 오로라: 청록→보라
+  return CAPE_COL[id]||'#c03a3a';
+}
+function drawCapeBack(g,id,frame,custom){
+  var cx=14, rows=7, y0=HOY+12, sw=(frame===1)?1:(frame===2?-1:0), r, x;
+  for(r=0;r<rows;r++){
+    var hw=5.6+r*0.5, L=Math.round(cx-hw+(sw>0?-0.6*r/3:0)), Rr=Math.round(cx+hw+(sw<0?0.6*r/3:0)), base=capeRowColor(id,r,rows,custom);
+    for(x=L;x<Rr;x++){
+      var end=rows-1+(((x+(sw>0?0:2))%4<2)?0:1);                       // 아랫단 물결
+      if(r>end) continue;
+      var col=base;
+      if(x<=L+1) col=sh(base,1.2);                                   // 왼쪽 빛 받는 면
+      else if(x>=Rr-2) col=sh(base,0.72);                            // 오른쪽 그늘
+      if(Math.abs(x-cx)<=2) col=sh(base,0.7);                       // 몸 가운데 안쪽 그림자(다리 사이로 보임)
+      if(r>=rows-1) col=sh(col,0.82);                                // 아랫단
+      dot(g,x,y0+r,col);
+    }
+  }
+  if(id==='cos_cape3'&&frame!==0){ dot(g,cx-5+((performance.now()/90)|0)%10,y0+2+((performance.now()/70)|0)%4,'#fff8d0'); }   // 황금 망토 반짝임
+  if(id==='cos_cape4'){ for(r=1;r<rows-1;r+=2) dot(g,cx-7+r,y0+r,'#8a4ae0'),dot(g,cx+6-r,y0+r,'#8a4ae0'); }                    // 그림자 망토 보라 안감
+}
+function drawWingsBack(g,id,frame){
+  var wc=WING_COL[id], pal={W:wc[0],w:wc[1],h:wc[2]}, dy=(frame===1)?-1:(frame===2?1:0);
+  paint(g,WING_L,0,HOY+3+dy,pal); paint(g,mirRows(WING_L),HW-9,HOY+3+dy,pal);
+}
 var ROBE={x:0,y:15,r:["...bBBBBBBBBBb..","...bBBBBBBBBBb..","..bBBBBBBBBBBBb.","..bbbbbbbbbbbb.."]};
 var AURA_COL={cos_aura1:'#ff7a2e',cos_aura2:'#8fd0ff',cos_aura3:'#c05aff',cos_aura4:'#7fe8ff',cos_aura5:null,cos_aura6:'#ffe14d',cos_aura7:'#ff9ac4',cos_aura8:'#ff6a2e'};
 
 var HW=28, HH=27, HOX=6, HOY=7;
 function heroSprite(id,frame,eq){
-  var key='hero|'+id+'|'+frame+'|'+(eq.w?eq.w.id:'')+'|'+(eq.a?eq.a.id:'')+'|'+(eq.acc?eq.acc.id:'')+'|'+(eq.hat?eq.hat.id:'')+'|'+(eq.cape?eq.cape.id:'')+'|'+(eq.dye||'')+'|'+(eq.custom?JSON.stringify(eq.custom):'')+'|'+(eq.noW?'nw':'');
+  var key='hero|'+id+'|'+frame+'|'+(eq.w?eq.w.id:'')+'|'+(eq.a?eq.a.id:'')+'|'+(eq.acc?eq.acc.id:'')+'|'+(eq.hat?eq.hat.id:'')+'|'+(eq.cape?eq.cape.id:'')+(eq.cape&&eq.cape.id==='cos_cape5'?'~'+(Math.floor(performance.now()/130)%28):'')+'|'+(eq.dye||'')+'|'+(eq.custom?JSON.stringify(eq.custom):'')+'|'+(eq.noW?'nw':'');
   if(ART.cache[key]) return ART.cache[key];
   var c=mk(HW,HH), g=c.getContext('2d');
   var base=(typeof HERO!=='undefined'&&HERO[id])||{skin:'#f4c896',hair:'#6a4420',suit:'#e0a83c',accent:'#fff2c0',trim:'#a86e18'};
@@ -417,13 +454,14 @@ function heroSprite(id,frame,eq){
   if(eq.dye){ suit=eq.dye; trim=sh(eq.dye,0.6); }
   else if(eq.a&&typeof AART!=='undefined'&&AART[eq.a.id]){ suit=AART[eq.a.id][0]; trim=AART[eq.a.id][1]; robe=AART[eq.a.id][2]; }
   var cu=eq.custom||{}, hair=cu.hair||base.hair, skin=cu.skin||base.skin;
+  if(cu.top) suit=cu.top;
   var pal={H:hair,h:sh(hair,0.68),S:skin,s:sh(skin,0.84),E:cu.eye?sh(cu.eye,0.55):'#2a2030',w:'#ffffff',m:'#c86060',
     B:suit,b:sh(suit,0.72),L:base.accent,T:trim,A:base.accent,P:'#3a3050',p:'#2a2238',K:'#5a3a22',k:'#7a5232'};
   function lay(o,p){ paint(g,o.r,HOX+(o.x||0),HOY+o.y,p); }
   // 망토/날개 (몸 뒤)
   if(eq.cape){
-    if(WING_COL[eq.cape.id]){ var wc=WING_COL[eq.cape.id]; lay(WING,{W:wc[0],w:wc[1]}); }
-    else { var cc=CAPE_COL[eq.cape.id]||'#c03a3a'; lay(CAPE,{C:cc,c:sh(cc,0.65)}); }
+    if(WING_COL[eq.cape.id]) drawWingsBack(g,eq.cape.id,frame);
+    else drawCapeBack(g,eq.cape.id,frame,cu.cape||null);
   }
   // 몸
   paint(g,HERO_BODY,HOX,HOY,pal);
