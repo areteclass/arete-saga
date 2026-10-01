@@ -504,7 +504,7 @@ renderMapNodes=function(){
     var pw2=document.getElementById('su-pw2').value||'';
     var cs=document.getElementById('su-cls'), cls=cs?cs.value:'';
     if(!id||!name){ inMsg('학번과 이름을 입력하세요.'); return; }
-    if(pw.length<4){ inMsg('비밀번호는 4자 이상!'); return; }
+    if(pw.length<6){ inMsg('비밀번호는 6자 이상으로 정해 주세요!'); return; }
     if(pw!==pw2){ inMsg('비밀번호 확인이 달라요.'); return; }
     inMsg('가입 중...');
     srv('signup',id,name,pw,cls).then(function(r){
@@ -581,6 +581,67 @@ renderMapNodes=function(){
   };
 })();
 
-function setVer(){ try{ var ver=document.getElementById('ver'); if(ver) ver.textContent='빌드 v20 즉시처치'; }catch(e){} }
+
+/* ═══════════════ v30 보안: 비밀번호 변경 · 임시 비밀번호 · 메모리 정리 ═══════════════ */
+(function(){
+  /* 로그인 응답에서 '임시 비밀번호로 들어왔는지' 기억 */
+  var _srv=srv;
+  srv=function(fn){
+    var p=_srv.apply(this,arguments);
+    if(fn==='initGame'){
+      var typed=arguments[2];
+      return p.then(function(r){ if(r&&r.ok){ G._mustPw=!!r.mustChangePw; G._tmpPw=typed; } return r; });
+    }
+    return p;
+  };
+  /* 월드 시작 후 메모리에 남은 비밀번호를 지움 + 임시 비밀번호면 변경 창을 띄움 */
+  var _sw=startWorld;
+  startWorld=function(){
+    _sw.apply(this,arguments);
+    var forced=G._mustPw, old=G._tmpPw;
+    G._pw=''; G._tmpPw='';
+    if(forced&&!G.guest) setTimeout(function(){ showPwModal(true,old); },900);
+  };
+  function mkEl(html,css){ var d=document.createElement('div'); if(css) d.style.cssText=css; d.innerHTML=html; return d; }
+  window.showPwModal=function(forced,oldPw){
+    var ex=document.getElementById('pw-modal'); if(ex) ex.remove();
+    var inp='width:100%;padding:11px;font-size:14px;border-radius:6px;border:3px solid var(--line);background:var(--bg2);color:var(--text);margin:4px 0 8px;font-family:var(--font-body)';
+    var m=mkEl('<div style="background:var(--panel);border:4px solid var(--gold);border-radius:12px;padding:20px 22px;width:310px;box-shadow:0 8px 0 var(--line)">'+
+      '<div style="font-family:var(--font-disp);font-size:16px;color:var(--gold);text-align:center">🔑 '+(forced?'새 비밀번호를 정해 주세요':'비밀번호 변경')+'</div>'+
+      (forced?'<div style="font-size:11px;color:var(--muted);margin:8px 0;line-height:1.6;text-align:center">선생님이 알려 준 임시 비밀번호는 다른 사람도 알 수 있어요.<br>나만 아는 비밀번호로 바꿔야 계속할 수 있어요.</div>':'')+
+      (forced&&oldPw?'':'<div style="font-size:11px;color:var(--muted)">지금 비밀번호</div><input id="pw-old" type="password" maxlength="40" style="'+inp+'">')+
+      '<div style="font-size:11px;color:var(--muted)">새 비밀번호 (6자 이상, 학번·쉬운 숫자 불가)</div><input id="pw-new" type="password" maxlength="40" style="'+inp+'">'+
+      '<div style="font-size:11px;color:var(--muted)">새 비밀번호 확인</div><input id="pw-new2" type="password" maxlength="40" style="'+inp+'">'+
+      '<div id="pw-msg" style="color:var(--bad);font-size:11px;min-height:15px;margin-bottom:8px"></div>'+
+      '<div style="display:flex;gap:8px"><button class="btn gold" style="flex:1;padding:11px" id="pw-ok">변경하기</button>'+(forced?'':'<button class="btn ghost" style="padding:11px 14px" id="pw-cancel">취소</button>')+'</div></div>',
+      'position:absolute;inset:0;z-index:130;display:flex;align-items:center;justify-content:center;background:rgba(6,4,14,.88)');
+    m.id='pw-modal'; document.getElementById('app').appendChild(m);
+    var msg=function(t){ document.getElementById('pw-msg').textContent=t||''; };
+    var cancel=document.getElementById('pw-cancel'); if(cancel) cancel.onclick=function(){ m.remove(); };
+    document.getElementById('pw-ok').onclick=function(){
+      var o=(forced&&oldPw)?oldPw:(document.getElementById('pw-old').value||''), n=document.getElementById('pw-new').value||'', n2=document.getElementById('pw-new2').value||'';
+      if(n.length<6){ msg('새 비밀번호는 6자 이상이에요.'); return; }
+      if(n!==n2){ msg('새 비밀번호 확인이 달라요.'); return; }
+      msg('변경 중…');
+      srv('changePassword',G.hakbun,o,n).then(function(r){
+        if(!r||!r.ok){ msg((r&&r.msg)||'변경하지 못했어요.'); return; }
+        if(r.token) G.token=r.token;                       // 이전 세션은 서버가 무효화 → 새 토큰으로 교체
+        G._mustPw=false; m.remove(); toast('🔑 <b>비밀번호를 바꿨어요!</b>'); if(typeof sfx==='function') sfx('buy');
+      }).catch(function(){ msg('통신 오류예요. 다시 시도해 주세요.'); });
+    };
+  };
+  /* 설정 화면에 '비밀번호 변경' 줄 추가 */
+  var _rs=renderSettings;
+  renderSettings=function(){
+    _rs();
+    if(G.guest) return;
+    var b=document.getElementById('set-body'); if(!b) return;
+    var row=mkEl('<span>🔑 비밀번호</span><button class="btn ghost" style="padding:8px 14px;font-size:11px" onclick="closeOvl(\'settings\');showPwModal(false)">변경</button>');
+    row.className='qrow'; row.style.display='flex'; row.style.justifyContent='space-between'; row.style.alignItems='center';
+    b.appendChild(row);
+  };
+})();
+
+function setVer(){ try{ var ver=document.getElementById('ver'); if(ver) ver.textContent='빌드 v30 보안'; }catch(e){} }
 window.addEventListener('DOMContentLoaded',setVer); window.addEventListener('load',setVer);
 })();
