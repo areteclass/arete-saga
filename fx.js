@@ -8,8 +8,8 @@
    ④ 필살기 5종 (화면 어두워짐 + 이름 배너 + 전용 연출)
       유성우 · 강철 가시 · 난무 참격 · 성스러운 파동 · 번개 폭풍
    ⑤ 스킬 버튼에 쿨타임 게이지
-   ⑥ 몹 밸런스 (v28): 체력은 '지역 기준 장비'와 '내 공격력'을 함께 보고 계산 → 한 방 사망 방지,
-      몹 공격은 내 최대 HP 비율, 필살기 게이지 충전 속도 조정, 스킬 피해 상향, 자동 스킬은 의미 있을 때만 사용
+   ⑥ 몬스터 난이도 2.0 (v32): 단계(1~5) · 종류(7가지 성격) · 위치(입구→안쪽)로 체력·공격·속도·인식·예고시간이 갈림
+      1단계는 맨손 새내기 기준, 초보 보호 상한/한 방 사망 방지 하한, 필살기 게이지 조정, 스킬 피해 상향
    필요: art.js v27 (무기 분리 지원). 설치: hero.js 다음 줄에 <script src="fx.js?v=27"></script>
    ═══════════════════════════════════════════════════════════════ */
 (function(){
@@ -156,40 +156,93 @@ function boltFx(x1,y1,x2,y2,dur,col,width,disp,onEnd){
 }
 function screenFlash(col,a,dur){ if(window.OPT&&OPT.reduceFx) return; fxAdd({L:2,dur:dur||0.18,drw:function(g){ var p=this.t/this.dur; g.globalAlpha=a*(1-p); g.fillStyle=col; g.fillRect(0,0,W,H); }}); }
 
-/* ═══════════════ 몹 밸런스 ═══════════════
-   목표: 일반 몹 약 5타 · 정예 약 12타 · 희귀 약 26타 (지역 기준 장비·숙련도 가정)
-         공격력이 지역 수준을 넘어도 최소 3타 · 7타 · 14타는 필요 (한 방 사망 방지)
-         공격력이 높을수록, 퀴즈로 숙련도를 올릴수록 더 적은 타수로 잡힘 → 성장의 의미 유지 */
+/* ═══════════════ 몬스터 난이도 2.0 ═══════════════
+   ① 단계(1~5번 섬): 체력 · 공격력 · 인식 범위 · 이동 속도 · 공격 예고 시간이 단계마다 달라진다
+   ② 종류(섬마다 3종): 입문 · 보통 · 날렵 · 단단 · 강타 · 거인 · 최강 — 체력/공격/속도/인식/예고가 서로 다르다
+   ③ 위치: 같은 등급 안에서도 입구에 가까운 몹이 약하고 안쪽으로 갈수록 강하다 (h0 → h5, 정예 h6 → h8)
+   ④ 기준: 1단계는 '맨손으로 시작한 새내기', 다음 단계부터는 '이전 단계 상점 무기를 쓰는 플레이어'
+   ⑤ 안전장치: 한 방 사망 방지(FLOOR) · 초보 보호(CAP: 내 힘으로 너무 오래 걸리지 않게)
+   ⑥ 공격력·숙련도가 오를수록 더 적은 타수로 잡힘 → 성장의 의미 유지 */
 var HIT_AVG=1.4;                      // 콤보(0.9·1.05·1.9)와 치명타를 평균 낸 타격 배수
-var HP_MULT=[5,12,26];                // 지역 기준 평균 타격 N번 분량 (일반·정예·희귀)
-var HP_FLOOR=[3,7,15];            // 아무리 강해져도 최소로 필요한 타수
-var SP_FACTOR=[1,1.12,0.92];          // 개체 종류별 체력 차이 (0:기본, 1:단단함, 2:날렵함)
+var MAST_REF=0.3;                     // 단계에 들어설 때 평균 숙련도(퀴즈로 얼마나 공부했는지)
+var HITS=[4.5,10,19];                 // 기준 플레이어가 잡는 데 필요한 평균 타수 (일반·정예·희귀)
+var HP_FLOOR=[3,7,15];                // 아무리 강해져도 최소로 필요한 타수 (한 방 사망 방지)
+var STAGE_HP=[0.8,0.9,0.95,1,1];      // 단계별 체력 완화 (1단계는 입문자용으로 낮춤)
+var HIT_CAP=[7,9,11,13,15], CAP_T=[1,2.3,4.2];   // 초보 보호: 내 평균 타격 기준 '최대 타수' 상한
 var DMG_PCT=[0.06,0.10,0.17];         // 몹 한 방이 최대 HP에서 차지하는 비율 (지역이 깊을수록 +)
+var STAGE_DMG=[0.75,0.95,1.05,1.15,1.25];
+var STAGE_AGGRO=[0.85,0.95,1,1.05,1.1];          // 인식 범위
+var STAGE_SPD=[0.85,0.95,1.05,1.15,1.25];        // 추격 속도
+var STAGE_WIND=[100,40,0,-30,-60];               // 공격 예고 시간 가감(ms) — 깊을수록 반응할 시간이 짧아짐
+var STAGE_CD=[1.15,1.05,1,0.95,0.9];             // 공격 간격 배수
+var SPEC={
+  novice:{hp:0.8,dmg:0.75,spd:0.85,aggro:0.8,wind:120,label:'입문'},
+  normal:{hp:1,dmg:1,spd:1,aggro:1,wind:0,label:'보통'},
+  swift:{hp:0.75,dmg:0.85,spd:1.35,aggro:1.15,wind:-90,label:'날렵'},
+  sturdy:{hp:1.4,dmg:0.9,spd:0.8,aggro:0.9,wind:80,label:'단단'},
+  brute:{hp:1.1,dmg:1.35,spd:1,aggro:1,wind:60,label:'강타'},
+  giant:{hp:1.7,dmg:1.4,spd:0.7,aggro:0.9,wind:160,label:'거인'},
+  apex:{hp:1.3,dmg:1.3,spd:1.1,aggro:1.1,wind:0,label:'최강'}
+};
+/* 섬별 3종류 (sp 0·1·2) — Addon.gs의 보상 배수 표(MOB_SPEC_RW_)와 같은 순서·같은 성격이어야 함 */
+var SPEC_MAP={ r1:['normal','novice','swift'],   // 늑대 · 임프 · 박쥐
+               r2:['swift','normal','sturdy'],   // 거미 · 두꺼비 · 게
+               r3:['brute','giant','swift'],     // 전갈 · 골렘 · 도마뱀
+               r4:['swift','brute','sturdy'],    // 들개 · 멧돼지 · 코뿔소
+               r5:['brute','normal','apex'] };   // 화염 늑대 · 용아병 · 심연 마수
 var SK_BOOST=2.4, ULT_BOOST=5.0;      // 스킬·필살기 피해 배율 (쿨타임 4초 값어치)
 var GAUGE_SCALE=0.3;                  // 필살기 게이지 충전 속도 (원래의 30%)
 function regIdx(rid){ var rs=G.regions||[]; for(var i=0;i<rs.length;i++) if(rs[i].id===rid) return i; return 0; }
 function mastOf(z){ var r=G.regions&&G.regions[z]; return (r&&typeof masteryOf==='function')?masteryOf(r.id):0; }
 var BAL={};
-BAL.refAtk=function(z){                 // 그 지역까지 온 사람이 갖출 만한 공격력 (상점 최고 무기 기준)
-  var best=0;
+var WEAPON_FALLBACK=[0,4,8,14,22];
+/** 이전 단계(z-1)까지 상점에서 살 수 있는 가장 좋은 무기의 공격 보너스 (시트에 무기가 없으면 기본 표) */
+BAL.prevWeapon=function(z){
+  if(z<=0) return 0;
+  var best=0, any=false;
   (G.items||[]).forEach(function(it){
     if(it.kind!=='무기'||it.effect!=='atk'||!(Number(it.price)>0)) return;
-    if((it.region?regIdx(it.region):0)<=z) best=Math.max(best,Number(it.value)||0);
+    any=true; if((it.region?regIdx(it.region):0)<=z-1) best=Math.max(best,Number(it.value)||0);
   });
-  return 10+z*2.5+best*1.3;
+  return any?best:WEAPON_FALLBACK[Math.min(4,z)];
 };
+BAL.refAtk=function(z){ return 8+2.5*z+BAL.prevWeapon(z)*1.15; };          // 1단계 = 맨손 기본 공격력
 BAL.curHit=function(z){ var atk=(G.save&&G.save.atk)||6; return atk*HIT_AVG*(1+mastOf(z)); };
-BAL.refHit=function(z){ return BAL.refAtk(z)*HIT_AVG*1.5; };
-BAL.hp=function(e){
-  var t=Math.min(2,e.tier||0), z=e.z||0;
-  var ref=BAL.refHit(z), cur=BAL.curHit(z), over=Math.max(1,cur/ref);
-  var hp=Math.max(ref*HP_MULT[t]*Math.pow(over,0.45), cur*HP_FLOOR[t])*(SP_FACTOR[e.sp||0]||1);   // 기준 초과분은 체력도 일부 따라 오름
-  return Math.max(24,Math.round(hp));
+BAL.refHit=function(z){ return BAL.refAtk(z)*HIT_AVG*(1+MAST_REF); };
+function mobIdx(e){ var m=/_h(\d)$/.exec(e.key||''); return m?Number(m[1]):-1; }
+BAL.pos=function(e){                                                        // 0(입구) ~ 1(가장 안쪽), 같은 등급 안에서
+  var i=mobIdx(e); if(i<0) return 0.5;
+  var t=e.tier||0, p=(t===0)?i/5:(t===1?(i-6)/2:0.5);
+  return Math.max(0,Math.min(1,p));
 };
-BAL.dmg=function(e){
-  var t=Math.min(2,e.tier||0), z=e.z||0, mx=(G.save&&G.save.maxHP)||100, def=(G.save&&G.save.def)||0;
-  var pct=DMG_PCT[t]+z*0.008*(t?1.2:1), red=Math.min(0.45,def*0.012);
+BAL.spec=function(e){ var rid=(G.regions[e.z]||{}).id, k=(SPEC_MAP[rid]||[])[e.sp||0]; return SPEC[k]||SPEC.normal; };
+BAL.hp=function(e){
+  var t=Math.min(2,e.tier||0), z=Math.min(4,e.z||0), sp=BAL.spec(e), p=BAL.pos(e);
+  var ref=BAL.refHit(z), cur=BAL.curHit(z), over=Math.max(1,cur/ref);
+  var hp0=ref*HITS[t]*STAGE_HP[z]*sp.hp*(0.9+0.2*p)*Math.pow(over,0.45);   // 기준보다 강해지면 체력도 일부 따라 오름
+  var fl=HP_FLOOR[t]*Math.min(1.4,Math.max(0.85,Math.pow(sp.hp,0.6))), cap=HIT_CAP[z]*CAP_T[t];
+  return Math.max(24,Math.round(Math.min(Math.max(hp0,cur*fl),cur*cap)));
+};
+BAL.rawDmg=function(e){
+  var t=Math.min(2,e.tier||0), z=Math.min(4,e.z||0), mx=(G.save&&G.save.maxHP)||100, def=(G.save&&G.save.def)||0, sp=BAL.spec(e), p=BAL.pos(e);
+  var pct=(DMG_PCT[t]+z*0.008*(t?1.2:1))*STAGE_DMG[z]*sp.dmg*(0.92+0.16*p), red=Math.min(0.45,def*0.012);
   return Math.max(1,Math.round(mx*pct*(1-red)));
+};
+BAL.dmg=BAL.rawDmg;                                                         // skills.js가 보호막·피해 감소를 얹어 감싼다
+/** 인식 범위 · 추격 속도 · 공격 예고(ms) · 공격 간격(ms) — remaster.js의 몬스터 AI가 사용 */
+BAL.ai=function(e){
+  var key=(e.z||0)+'|'+(e.tier||0)+'|'+(e.sp||0);
+  if(e._ai&&e._aiK===key) return e._ai;
+  var t=Math.min(2,e.tier||0), z=Math.min(4,e.z||0), sp=BAL.spec(e);
+  e._aiK=key;
+  return (e._ai={R:[3.2,4,4.6][t]*sp.aggro*STAGE_AGGRO[z], spd:(1.5+t*0.45)*sp.spd*STAGE_SPD[z],
+                 wind:Math.max(380,(t===2?820:560)+sp.wind+STAGE_WIND[z]), cd:(t===2?2300:1500)*STAGE_CD[z]});
+};
+/** 지금의 나에게 이 몬스터가 얼마나 위험한가 (1 쉬움 · 2 보통 · 3 어려움 · 4 위험) — 잡는 동안 예상 피해 비율로 판단 */
+BAL.threat=function(e){
+  var cur=BAL.curHit(e.z||0), hp=e.hp===undefined?BAL.hp(e):e.hp, T=(hp/Math.max(1,cur))/3, ai=BAL.ai(e), mx=(G.save&&G.save.maxHP)||100;
+  var loss=(BAL.rawDmg(e)/mx)*(T/(ai.cd/1000))*0.5;
+  return loss<0.05?1:(loss<0.12?2:(loss<0.25?3:4));
 };
 window.BAL=BAL;
 function ensureMobHp(e){ if(e&&e.hp===undefined){ e.maxhp=BAL.hp(e); e.hp=e.maxhp; } }
@@ -576,15 +629,31 @@ function hudCd(){
 
 var _update=update;
 update=function(dt){ _update(dt); stepFX(dt); hudCd(); };
+var THREAT_COL=['#6ae06a','#ffe14d','#ff9a3a','#ff4040'];
+function drawThreatPips(g){
+  var t=performance.now();
+  entities.forEach(function(e){
+    if(e.type!=='hunt'||e.dead||(e.hp!==undefined&&e.hp<=0)) return;
+    if(!regionReachable(Math.floor(e.tx/ZC))) return;
+    var d=Math.hypot(e.tx-player.x,e.ty-player.y); if(d>5.5) return;
+    var x=(e.tx+0.5)*TILE-cam.x, y=(e.ty+0.5)*TILE-cam.y; if(x<-30||x>W+30||y<-30||y>H+30) return;
+    if(!e._thT||t-e._thT>500){ e._thT=t; e._th=BAL.threat(e); }
+    var n=e._th||1, col=THREAT_COL[n-1], yy=y-TILE*0.74, i;
+    g.save();
+    for(i=0;i<n;i++){ var px=x+(i-(n-1)/2)*8; g.fillStyle='#120a1a'; g.fillRect(Math.round(px-3.5),Math.round(yy-3.5),7,7); g.fillStyle=col; g.fillRect(Math.round(px-2.5),Math.round(yy-2.5),5,5); }
+    if((e.tier||0)===0&&d<3.4){ g.font=Math.round(TILE*0.2)+'px DungGeunMo,sans-serif'; g.textAlign='center'; g.textBaseline='bottom'; g.lineWidth=3; g.strokeStyle='rgba(0,0,0,.85)'; g.fillStyle=col; var lb=BAL.spec(e).label; g.strokeText(lb,x,yy-6); g.fillText(lb,x,yy-6); }
+    g.restore();
+  });
+}
 var _draw=draw;
-draw=function(){ _draw(); if(G.save&&running) drawFX(ctx); };
+draw=function(){ _draw(); if(G.save&&running){ drawThreatPips(ctx); drawFX(ctx); } };
 
 window.FX={explode:explode,ring:ring,pillar:pillar,boltFx:boltFx,list:FXS,parts:PT,step:stepFX,draw:drawFX,skills:SKFX,ults:ULT,
   /* v31: 스킬트리 2.0(skills.js)이 쓰는 도구들 */
-  v:31,gaugeMul:1,fxAdd:fxAdd,after:after,glow:glow,glowP:glowP,sparkP:sparkP,smokeP:smokeP,rockP:rockP,featherP:featherP,rgba:rgba,rnd:rnd,lerp:lerp,ease:ease,outC:outC,
+  v:32,gaugeMul:1,fxAdd:fxAdd,after:after,glow:glow,glowP:glowP,sparkP:sparkP,smokeP:smokeP,rockP:rockP,featherP:featherP,rgba:rgba,rnd:rnd,lerp:lerp,ease:ease,outC:outC,
   pos:pos,hero:hero,muzzle:muzzle,hitMob:hitMob,magicCircle:magicCircle,screenFlash:screenFlash,sfx2:sfx2,RED:RED,quake:quake,ultBanner:ultBanner,ultDim:ultDim,
   ensureMobHp:ensureMobHp,BAL:BAL,SK_BOOST:SK_BOOST,ULT_BOOST:ULT_BOOST,mastOf:mastOf,ultWorth:ultWorth,skillWorth:skillWorth,
   markCast:function(){ castT=performance.now(); },fxUlt:castActionSkill};
-function setVer(){ try{ var v=document.getElementById('ver'); if(v) v.textContent='빌드 v31 스킬트리'; }catch(e){} }
+function setVer(){ try{ var v=document.getElementById('ver'); if(v) v.textContent='빌드 v32 몬스터 난이도'; }catch(e){} }
 window.addEventListener('DOMContentLoaded',setVer); window.addEventListener('load',setVer);
 })();
