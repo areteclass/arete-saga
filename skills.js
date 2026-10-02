@@ -1,7 +1,7 @@
 /* ═══════════════════════════════════════════════════════════════
    아레테 사가 v31 스킬트리 2.0 (skills.js)
    · 캐릭터마다 전투 스킬 5개(Lv1~5, Lv3에서 갈림길) · 패시브 4개 · 필살기 2종 → 3칸 슬롯 + 필살기 칸에 장착
-   · 직접 누르는 방식(1·2·3 / E 키 또는 화면 버튼). 필살기도 게이지가 차면 직접 발동
+   · 직접 누르는 방식(키보드 1·2·3, 필살기는 4 / 숫자패드도 가능 / 또는 화면 버튼). 필살기도 게이지가 차면 직접 발동
    · 상태이상(화상·둔화·기절), 버프(공격력·이동·피해감소·보호막), 회전체·장판·유성 등 효과 10종을 조합해 스킬을 구성
    · 스킬 정의(이름·비용·조건)는 서버(Addon.gs)가 내려주고, 이 파일은 연출·수치만 가진다.
    필요: fx.js v31 (먼저 로드). 로드 순서: remaster → art → world → hero → fx → skills
@@ -586,12 +586,16 @@ function buildHud(){
     var fire=function(ev){ ev.preventDefault(); cast(k,true); }; b.addEventListener('touchstart',fire,{passive:false}); b.addEventListener('mousedown',fire);
     pad.appendChild(b); });
   var u=document.createElement('button'); u.className='skbtn empty'; u.id='skU'; u.style.right='37px'; u.style.bottom='215px';
-  u.innerHTML='<img alt=""><div class="cdo"></div><div class="cdt"></div><span class="keyh">E</span>';
+  u.innerHTML='<img alt=""><div class="cdo"></div><div class="cdt"></div><span class="keyh">4</span>';
   var fu=function(ev){ ev.preventDefault(); castUlt(true); }; u.addEventListener('touchstart',fu,{passive:false}); u.addEventListener('mousedown',fu);
   pad.appendChild(u);
-  window.addEventListener('keydown',function(ev){
-    if(!enabled()||overlayOpen()) return;
-    if(ev.code==='Digit1') cast('1',true); else if(ev.code==='Digit2') cast('2',true); else if(ev.code==='Digit3') cast('3',true); else if(ev.code==='KeyE') castUlt(true); });
+  window.addEventListener('keydown',function(ev){                   // 1·2·3 = 전투 스킬, 4 = 필살기 (숫자패드도 동일)
+    if(!enabled()||overlayOpen()||ev.repeat) return;
+    var k=ev.code;
+    if(k==='Digit1'||k==='Numpad1') cast('1',true);
+    else if(k==='Digit2'||k==='Numpad2') cast('2',true);
+    else if(k==='Digit3'||k==='Numpad3') cast('3',true);
+    else if(k==='Digit4'||k==='Numpad4') castUlt(true); });
 }
 function hudStep(){
   if(!hudBuilt) buildHud(); if(!hudBuilt) return;
@@ -689,7 +693,7 @@ function renderSkills2(){
   var tabs=[['a','⚔ 전투 스킬'],['p','✚ 패시브'],['u','★ 필살기']];
   document.getElementById('s2-tabs').innerHTML=tabs.map(function(t){ return '<button class="btn '+(tab===t[0]?'gold':'ghost')+'" style="flex:1;padding:8px 4px;font-size:11px" onclick="S2.tab(\''+t[0]+'\')">'+t[1]+'</button>'; }).join('');
   var list=(G.fskills||[]).filter(function(d){ return d.c===c&&d.t===tab; }), html=list.map(cardHtml).join('');
-  var note={a:'슬롯에 넣은 스킬만 쓸 수 있어요. 번호 버튼으로 칸을 정하고, 다른 칸에 있는 스킬을 누르면 서로 자리가 바뀌어요. 스킬 레벨 3에서 <b>갈림길</b>을 고르면 스킬의 성격이 바뀌어요.',p:'모든 전투 스킬에 영향을 주는 능력이에요. 캐릭터 레벨이 오를수록 더 높은 레벨까지 올릴 수 있어요.',u:'게이지가 가득 차면 ★ 버튼(또는 E)으로 직접 발동해요. 자동 사냥 중에는 알아서 써요.'}[tab];
+  var note={a:'슬롯에 넣은 스킬만 쓸 수 있어요. 번호 버튼으로 칸을 정하고, 다른 칸에 있는 스킬을 누르면 서로 자리가 바뀌어요. 스킬 레벨 3에서 <b>갈림길</b>을 고르면 스킬의 성격이 바뀌어요.',p:'모든 전투 스킬에 영향을 주는 능력이에요. 캐릭터 레벨이 오를수록 더 높은 레벨까지 올릴 수 있어요.',u:'게이지가 가득 차면 ★ 버튼(또는 키보드 4)으로 직접 발동해요. 자동 사냥 중에는 알아서 써요.'}[tab];
   document.getElementById('s2-body').innerHTML=html+'<div class="s2-note">'+note+'</div>';
 }
 window.S2={
