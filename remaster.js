@@ -349,8 +349,9 @@ function mobAI(dt,t){
     if(e.hx===undefined){ e.hx=e.ox; e.hy=e.oy; e.agB=0; }
     if(e.dead||(e.hp!==undefined&&e.hp<=0)){ e.ox=e.hx; e.oy=e.hy; e.aggro=false; e.wind=0; e.agB=0; continue; }
     if(!regionReachable(Math.floor(e.hx/ZC))) continue;
+    var A=(window.BAL&&BAL.ai)?BAL.ai(e):null;              /* 단계·종류별 난이도(fx.js) — 없으면 예전 값 */
     var dx=px0-e.ox, dy=py0-e.oy, d=Math.hypot(dx,dy)||0.001;
-    var R=e.tier===2?4.6:(e.tier===1?4:3.2);
+    var R=A?A.R:(e.tier===2?4.6:(e.tier===1?4:3.2));
     var hd=Math.hypot(e.ox-e.hx,e.oy-e.hy);
     if(!e.aggro&&d<R&&!dying&&hd<1){ e.aggro=true; e.alertT=t; e.nextAtk2=t+450; }
     if(e.aggro&&(d>R*2.2||hd>7||dying)){ e.aggro=false; e.wind=0; }
@@ -358,20 +359,20 @@ function mobAI(dt,t){
     if(e.wind){
       if(t>=e.wind){
         var reach=e.tier===2?1.8:1.3;
-        e.lunge=t; e.wind=0; e.nextAtk2=t+(e.tier===2?2300:1500);
+        e.lunge=t; e.wind=0; e.nextAtk2=t+(A?A.cd:(e.tier===2?2300:1500));
         if(e.tier===2){ addRing(e.tx+0.5,e.ty+0.5); shakeScreen(5); noise(0.15,0.05); }
         if(Math.hypot(px0-e.ox,py0-e.oy)<=reach) mobHitPlayer(e,t);
       }
     } else if(e.aggro){
       var stop=(e.tier===2)?1.1:0.8;
       if(d>stop){
-        var sp=(1.5+e.tier*0.45)*dt;
+        var sp=(A?A.spd:(1.5+e.tier*0.45))*dt;
         var nx=e.ox+dx/d*sp, ny=e.oy+dy/d*sp;
         if(!blockedWorld(Math.floor(nx+0.5),Math.floor(e.oy+0.5))) e.ox=nx;
         if(!blockedWorld(Math.floor(e.ox+0.5),Math.floor(ny+0.5))) e.oy=ny;
       }
       if(d<(e.tier===2?1.6:1.15)&&t>=(e.nextAtk2||0)){
-        e.windStart=t; e.wind=t+(e.tier===2?820:560);
+        e.windStart=t; e.wind=t+(A?A.wind:(e.tier===2?820:560));
         e.lgx=dx/d; e.lgy=dy/d;
       }
     } else if(hd>0.05){
