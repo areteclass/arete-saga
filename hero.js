@@ -61,9 +61,47 @@ var A={ taro:{face:[88,52],top:3, hand:[30,163]},
         hana:{face:[70,55],top:18,hand:[17,165]},
         yuri:{face:[85,48],top:3, hand:[27,152]},
         leon:{face:[72,50],top:3, hand:[14,168]} };
+/* 머리 기준점: 그림에서 직접 측정한 '두 눈의 한가운데(cx)'와 '눈높이(ey)'. 정수리·머리 폭은 그림에서 읽어 자동 계산 */
+var HEAD={ taro:{cx:95,ey:55}, mir:{cx:110,ey:55}, hana:{cx:82,ey:62}, yuri:{cx:94,ey:56}, leon:{cx:88,ey:56} };
+var headC={};
+function headInfo(id,raw){
+  if(headC[id]) return headC[id];
+  var H0=HEAD[id]||HEAD.taro, w=raw.width, h=Math.min(raw.height,130), d=raw.getContext('2d').getImageData(0,0,w,h).data, cx=H0.cx;
+  function op(x,y){ return x>=0&&x<w&&y>=0&&y<h&&d[(y*w+x)*4+3]>128; }
+  var ht=0, found=false;
+  for(;ht<h&&!found;ht++){ for(var x=cx-8;x<=cx+8;x++){ if(op(x,ht)){ found=true; break; } } }
+  ht=Math.max(0,ht-1);
+  function wAt(y){ if(!op(cx,y)) return 0; var l=cx,r=cx; while(op(l-1,y)) l--; while(op(r+1,y)) r++; return r-l+1; }
+  var Wh=(wAt(ht+20)+wAt(H0.ey)*0.85)/2;                 // 머리(정수리 폭과 눈높이 폭의 평균)
+  return (headC[id]={cx:cx,ey:H0.ey,ht:ht,Wh:Wh,wEar:wAt(H0.ey+4),wAt:wAt,
+    domeRow:function(width){ for(var dd=0;dd<70;dd++){ if(wAt(ht+dd)>=width) return dd; } return 30; }});   // 머리 둘레가 이 폭이 되는 지점(정수리로부터)
+}
+var BODY_CX={ taro:91, mir:102, hana:70, yuri:88, leon:81 };      // 몸통(허리·발) 중심 — 날개와 망토는 머리가 아니라 몸에 맞춘다
+var BUILTIN_CAPE={ taro:1, mir:1 };            // 기본 복장에 큰 망토가 있는 캐릭터
+var HAT_KIND={cos_hat2:'crown',cos_hat11:'crown',cos_hat12:'crown',cos_hat13:'crown',ac_crown:'crown',
+  cos_hat1:'brim',cos_hat7:'brim',cos_hat3:'brim2',cos_hat5:'helm',cos_hat10:'helm',cos_hat4:'mask',cos_hat6:'wreath',
+  cos_hat8:'phones',cos_hat9:'halo',ac_halo:'ring',cos_owl:'owl'};
+/** 모자·왕관·고리를 그 캐릭터의 머리 크기와 정수리 모양에 맞춰 앉힌다 */
+function seatHeadgear(put,ox,oy,HD,h,hid){
+  var kind=HAT_KIND[hid]||'brim', Wh=HD.Wh, cx=HD.cx, ht=HD.ht;
+  function atBottom(wPx,bottom){ var sc=wPx/h.width; put(h,ox+cx-wPx/2,oy+bottom-h.height*sc,sc); }
+  function atTop(wPx,top){ var sc=wPx/h.width; put(h,ox+cx-wPx/2,oy+top,sc); }
+  if(kind==='crown'){                                                   // 머리 둘레와 폭이 같아지는 높이에 밴드를 걸친다 → 쓴 것처럼 보임
+    var wPx=(hid==='ac_crown'?0.62:0.84)*Wh, row=HD.domeRow(wPx*1.14); atBottom(wPx,ht+row+3);   // 머리가 왕관보다 조금 넓어지는 지점에 밴드를 두어 머리를 감싼 모양으로
+  } else if(kind==='brim') atBottom(1.28*Wh,ht+26);
+  else if(kind==='brim2') atBottom(1.22*Wh,ht+28);
+  else if(kind==='helm') atBottom(1.1*Wh,ht+34);
+  else if(kind==='mask') atBottom(1.0*Wh,ht+34);
+  else if(kind==='wreath') atTop(1.0*Wh,ht+7);
+  else if(kind==='halo') atBottom(0.95*Wh,ht-3);                       // 가는 금빛 고리: 머리 바로 위에 떠 있음
+  else if(kind==='ring') atBottom(0.92*Wh,ht+8);                       // 성좌의 고리(큰 장식 고리): 정수리를 감싸듯 가까이
+  else if(kind==='owl') atBottom(1.05*Wh,ht+24);
+  else if(kind==='phones'){                                             // 이어컵이 귀(눈높이 아래)에 오고 머리 폭보다 조금 넓게
+    var sc2=Math.min(1.5,Math.max(1.2,(HD.wEar+34)/h.width)); put(h,ox+cx-h.width*sc2/2,oy+HD.ey+6-h.height*0.66*sc2,sc2);
+  }
+}
 var WINGS={cos_cape6:1,cos_cape7:1,cos_cape9:1};
 var LONG={w_t3:1,w_thunder:1,w_spark:1,w_sage:1,w_moon:1,w_orb1:1,w_orb2:1,w_orb3:1,w_orb4:1};
-var BIGCROWN={cos_hat2:1,cos_hat11:1,cos_hat12:1,cos_hat13:1};
 var AURAS={cos_aura1:'#ff7a2e',cos_aura2:'#8fd0ff',cos_aura3:'#c05aff',cos_aura4:'#7fe8ff',cos_aura5:'#ff8ae0',cos_aura6:'#ffe14d',cos_aura7:'#ff9ac4',cos_aura8:'#ff6a2e'};
 var W_ANG=-18*Math.PI/180, W_SC=1.35, PAD=140;
 
@@ -84,7 +122,7 @@ function compose(id,eq){
   var raw=part('base_'+id); if(!raw) return null;
   var base=recolor(raw,'mask_hair_'+id,cu.hair||null);
   if(cloth) base=recolor(base,'mask_cloth_'+id,cloth);
-  var a=A[id]||A.taro, fx=a.face[0], fy=a.face[1];
+  var a=A[id]||A.taro, HD=headInfo(id,raw), fx=BODY_CX[id]||HD.cx;
   var c=mk(base.width+PAD*2,base.height+PAD*2), g=c.getContext('2d'); g.imageSmoothingEnabled=false;
   var ox=PAD, oy=PAD;
   function put(im,x,y,s){ s=s||1; g.drawImage(im,Math.round(x),Math.round(y),Math.round(im.width*s),Math.round(im.height*s)); }
@@ -94,7 +132,7 @@ function compose(id,eq){
     if(cp){
       if(cu.cape&&!WINGS[eq.cape.id]) cp=recolor(cp,null,cu.cape);
       if(WINGS[eq.cape.id]){ var s1=1.35; put(cp,ox+fx-cp.width*s1/2,oy+75-cp.height*s1/3,s1); }
-      else { var s2=1.45; put(cp,ox+fx-cp.width*s2/2,oy+78,s2); }
+      else { var s2=BUILTIN_CAPE[id]?1.9:1.45; put(cp,ox+fx-cp.width*s2/2,oy+(BUILTIN_CAPE[id]?64:78),s2); }   // 원래 망토가 큰 캐릭터는 더 크게 펼쳐 바깥으로 드러나게
     }
   }
   // 2) 몸
@@ -115,21 +153,15 @@ function compose(id,eq){
   if(eq.acc){
     var ai=part(eq.acc.id), id2=eq.acc.id;
     if(ai){
-      if(id2==='ac_glass') put(ai,ox+fx-ai.width*0.25,oy+fy-ai.height*0.25+2,0.5);
-      else if(id2==='ac_crown'||id2==='ac_halo'||id2==='ac_phoenix'){ if(!eq.hat||id2==='ac_phoenix') put(ai,ox+fx-ai.width*0.4,oy+a.top-ai.height*0.8+10,0.8); }
-      else put(ai,ox+fx-ai.width*0.275,oy+86,0.55);
+      if(id2==='ac_glass'){ var gs=0.78*HD.Wh/ai.width; put(ai,ox+HD.cx-ai.width*gs/2,oy+HD.ey+2-ai.height*gs/2,gs); }       // 눈높이에 안경
+      else if(id2==='ac_crown'||id2==='ac_halo'){ if(!eq.hat) seatHeadgear(put,ox,oy,HD,ai,id2); }
+      else if(id2==='ac_phoenix'){ var ps=0.5*HD.Wh/ai.width; put(ai,ox+HD.cx+0.1*HD.Wh,oy+HD.ht+24-ai.height*ps,ps); }       // 머리 오른쪽 위에 깃털
+      else if(id2==='ac_spider'){ var ss=0.62; put(ai,ox+HD.cx-ai.width*ss/2,oy+HD.ey+30,ss); }                                // 목도리: 위쪽 고리가 목에 감기고 끝자락이 가슴으로
+      else { var ns=0.55; put(ai,ox+HD.cx-ai.width*ns/2,oy+HD.ey+34,ns); }                                                    // 목걸이는 가슴
     }
   }
   // 5) 모자
-  if(eq.hat){
-    var h=part(eq.hat.id), hid=eq.hat.id;
-    if(h){
-      if(hid==='cos_hat9') put(h,ox+fx-h.width/2,oy+a.top-h.height-2);
-      else if(hid==='cos_hat8') put(h,ox+fx-h.width*1.4/2,oy+fy+7-36*1.4,1.4);          // 머리 크기에 맞춰 키우고 이어컵을 귀 높이로
-      else if(hid==='cos_hat6') put(h,ox+fx-h.width/2,oy+a.top+6);
-      else { var hs=BIGCROWN[hid]?0.75:1; put(h,ox+fx-h.width*hs/2,oy+a.top-h.height*hs*0.55,hs); }
-    }
-  }
+  if(eq.hat){ var h=part(eq.hat.id); if(h) seatHeadgear(put,ox,oy,HD,h,eq.hat.id); }
   var out={c:c,bw:base.width,bh:base.height,blade:blade};
   return (compC[key]=out);
 }
@@ -369,6 +401,6 @@ drawSelBig=function(id){
   })();
 };
 
-function setVer(){ try{ var v=document.getElementById('ver'); if(v) v.textContent='빌드 v28 밸런스'; }catch(e){} }
+function setVer(){ try{ var v=document.getElementById('ver'); if(v) v.textContent='빌드 v33 꾸미기'; }catch(e){} }
 window.addEventListener('DOMContentLoaded',setVer); window.addEventListener('load',setVer);
 })();
