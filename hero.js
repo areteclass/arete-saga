@@ -210,6 +210,7 @@ function drawHeroArt(g,id,eq,cx,groundY,H){
   return true;
 }
 window.drawHeroArt=drawHeroArt;
+window.HeroArt={part:part};                                  // 도감 등에서 장비 그림을 쓰기 위해
 
 /* ── 무대 배경 ── */
 function drawStage(g,W,H,col,t){
