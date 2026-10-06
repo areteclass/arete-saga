@@ -10,7 +10,7 @@
 (function(){
 var T0=(window.performance&&performance.now)?performance.now():0;
 var diag=/[?&]perf=1/.test(location.search); try{ if(diag) localStorage.setItem('cs_perf','1'); else if(/[?&]perf=0/.test(location.search)) localStorage.removeItem('cs_perf'); else diag=localStorage.getItem('cs_perf')==='1'; }catch(e){}
-var LOG=[], marks=[];
+var LOG=[], marks=[], serverState=null;
 function now(){ return performance.now(); }
 function mark(name){ marks.push([name,Math.round(now())]); }
 
@@ -22,11 +22,58 @@ function warm(){
     var t=now();
     fetch(API_URL,{method:'POST',body:JSON.stringify({fn:'ping',token:'',args:[]})})
       .then(function(r){ return r.json(); })
-      .then(function(j){ LOG.push({fn:'ping(서버 깨우기)',total:Math.round(now()-t),server:j&&j._ms,ok:!!(j&&j.ok)}); render(); })
+      .then(function(j){ serverState=!!(j&&j.ok&&typeof j._ms==='number'); LOG.push({fn:'ping(서버 깨우기)',total:Math.round(now()-t),server:j&&j._ms,ok:!!(j&&j.ok)}); render(); stamp(); })
       .catch(function(){ LOG.push({fn:'ping(서버 깨우기)',total:Math.round(now()-t),err:1}); render(); });
   }catch(e){}
 }
 setTimeout(warm,80);
+
+/* ③ 설치 점검 + 버전 표시
+   다른 파일들도 각자 '빌드 vNN'을 적어 두고, 페이지가 다 열릴 때 등록 순서대로 덮어쓰기 때문에
+   마지막에 실행되는 옛 파일의 번호가 남아 있었습니다. 그래서 모든 파일이 끝난 뒤 한 번 더 확정해서 적습니다.
+   각 파일이 '이번 버전에 맞는 기능'을 갖고 있는지 확인해서, 빠졌거나 옛 파일이면 알려 줍니다. */
+var RELEASE='36';
+var PROBES=[
+  ['remaster.js',function(){ return !!window.RM; },'몬스터 움직임·조명'],
+  ['art.js',function(){ return !!(window.ART&&ART.v>=29); },'도트 그래픽'],
+  ['world.js',function(){ return typeof showPwModal==='function'; },'비밀번호 변경·월드'],
+  ['hero.js',function(){ return !!window.HeroArt; },'캐릭터 일러스트(v34 이상)'],
+  ['fx.js',function(){ return !!(window.FX&&FX.v>=32); },'전투 연출·몬스터 난이도(v32 이상)'],
+  ['skills.js',function(){ return !!(window.SKILLS&&SKILLS.statLine); },'스킬트리'],
+  ['audio.js',function(){ return !!window.AU; },'배경음·효과음'],
+  ['battle.js',function(){ return !!window.BATTLE; },'퀴즈 전투 화면'],
+  ['codex.js',function(){ return !!window.CODEX; },'도감·업적']
+];
+var CHECK=[];
+function runCheck(){
+  CHECK=PROBES.map(function(p){ var ok=false; try{ ok=!!p[1](); }catch(e){} return {name:p[0],ok:ok,hint:p[2]}; });
+  CHECK.push({name:'서버(Addon.gs)',ok:serverState===true,hint:'새 버전으로 배포 필요',unknown:serverState===null});
+  return CHECK;
+}
+function badList(){ return runCheck().filter(function(c){ return !c.ok&&!c.unknown; }); }
+function stamp(){
+  try{
+    var v=document.getElementById('ver'); if(!v) return;
+    var bad=badList();
+    v.textContent='빌드 v'+RELEASE+(bad.length?' ⚠ 점검':'');
+    v.style.pointerEvents='auto';
+    v.onclick=function(){
+      var b=badList();
+      var msg=b.length?('⚠ 최신이 아닌 파일: <b>'+b.map(function(x){ return x.name; }).join(', ')+'</b><br><small>파일을 다시 올리고 index.html 번호를 올렸는지 확인해 주세요</small>'):'✔ 모든 파일이 최신이에요 (v'+RELEASE+')';
+      if(typeof toast==='function') toast(msg);
+    };
+  }catch(e){}
+}
+window.addEventListener('load',function(){ setTimeout(stamp,700); setTimeout(stamp,2600); setTimeout(guard,900); });   // 다른 파일의 표시가 끝난 뒤에 확정
+/** 다른 코드가 나중에 다시 덮어써도(로그인 후 등) 바로 원래대로 되돌린다 */
+var guarding=false;
+function guard(){
+  try{
+    var v=document.getElementById('ver'); if(!v||guarding||!window.MutationObserver) return; guarding=true;
+    new MutationObserver(function(){ var want='빌드 v'+RELEASE+(badList().length?' ⚠ 점검':''); if(v.textContent!==want) v.textContent=want; })
+      .observe(v,{childList:true,characterData:true,subtree:true});
+  }catch(e){}
+}
 
 /* ② 진단 (?perf=1 일 때만) */
 if(!diag) return;
@@ -64,7 +111,7 @@ function build(){
 }
 function kb(n){ return n?Math.round(n/1024)+'KB':'?'; }
 function text(){
-  var out=[], nav=(performance.getEntriesByType&&performance.getEntriesByType('navigation')[0])||null;
+  var out=['perf.js v'+RELEASE+'  (이 줄과 아래 [설치 점검]이 보이면 최신 perf.js입니다)'], nav=(performance.getEntriesByType&&performance.getEntriesByType('navigation')[0])||null;
   out.push('[페이지] '+(navigator.connection&&navigator.connection.effectiveType?('네트워크 '+navigator.connection.effectiveType+' · '):'')+(window.innerWidth+'×'+window.innerHeight));
   marks.forEach(function(m){ out.push('  '+String(m[1]).padStart(6)+'ms  '+m[0]); });
   if(nav) out.push('  HTML 받기 끝 '+Math.round(nav.responseEnd)+'ms · 문서 해석 끝 '+Math.round(nav.domContentLoadedEventEnd)+'ms');
@@ -73,6 +120,8 @@ function text(){
   out.push('[오래 걸린 파일 상위 6개]');
   res.slice(0,6).forEach(function(r){ var n=r.name.replace(/^https?:\/\//,'').split('?')[0]; if(n.length>44) n='…'+n.slice(-43); out.push('  '+String(Math.round(r.duration)).padStart(5)+'ms  '+kb(r.transferSize||r.encodedBodySize)+'  '+n); });
   var tot=0; res.forEach(function(r){ tot+=(r.transferSize||r.encodedBodySize||0); }); out.push('  받은 파일 합계 약 '+kb(tot)+' ('+res.length+'개)');
+  out.push('[설치 점검] 빌드 v'+RELEASE);
+  runCheck().forEach(function(c){ out.push('  '+(c.ok?'✔':(c.unknown?'…':'✘'))+' '+c.name+(c.ok?'':'  ← '+(c.unknown?'확인 중':'없거나 예전 파일: '+c.hint))); });
   out.push('[서버 호출]  총 = 서버 처리 + 네트워크·대기');
   if(!LOG.length) out.push('  (아직 없음 — 로그인 등을 해 보세요)');
   LOG.slice(-14).forEach(function(l){
@@ -83,5 +132,5 @@ function text(){
   return out.join('\n');
 }
 function render(){ if(body) body.textContent=text(); }
-window.PERF={text:text,log:LOG,marks:marks};
+window.PERF={text:text,log:LOG,marks:marks,check:function(){ return runCheck(); }};
 })();
