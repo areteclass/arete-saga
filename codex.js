@@ -273,6 +273,6 @@ var _sfs=syncFromSave; syncFromSave=function(){ var r=_sfs.apply(this,arguments)
 window.addEventListener('load',function(){ setTimeout(function(){ setBadge(badgeCount()); },1500); });
 
 /* 빌드 표시 */
-(function(){ function stamp(){ var v=document.getElementById('ver'); if(v) v.textContent='빌드 v34 전투·소리·도감'; }
+(function(){ function stamp(){ var v=document.getElementById('ver'); if(v) v.textContent='빌드 v35 로딩 개선'; }
   if(typeof setVer==='function'){ var _sv=setVer; setVer=function(){ _sv.apply(this,arguments); stamp(); }; } stamp(); })();
 })();
