@@ -271,8 +271,4 @@ setInterval(watchDiscovery,1200);
 /* 보상·구입 직후 화면 갱신 */
 var _sfs=syncFromSave; syncFromSave=function(){ var r=_sfs.apply(this,arguments); if(el('codex')&&el('codex').classList.contains('open')) renderCollBar(); return r; };
 window.addEventListener('load',function(){ setTimeout(function(){ setBadge(badgeCount()); },1500); });
-
-/* 빌드 표시 */
-(function(){ function stamp(){ var v=document.getElementById('ver'); if(v) v.textContent='빌드 v35 로딩 개선'; }
-  if(typeof setVer==='function'){ var _sv=setVer; setVer=function(){ _sv.apply(this,arguments); stamp(); }; } stamp(); })();
 })();
